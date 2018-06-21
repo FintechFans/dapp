@@ -1,63 +1,79 @@
+-- import Html exposing (Html, text, button, div, h1)
+-- import Html.Events exposing (onClick)
+-- import Random
+-- import List.Nonempty
+
+-- main : Program Never Model Msg
+-- main = Html.program
+--        { init = init
+--        , view = view
+--        , update = update
+--        , subscriptions = subscriptions
+--        }
+
+-- type alias Model =
+--     { oracleAnswer : String
+--     }
+
+-- type Msg = Foo
+--     | Roll
+--     | NewFace Int
+
+-- choices : List.Nonempty.Nonempty String
+-- choices = List.Nonempty.Nonempty "Mango"
+--           [ "Tropical Fruits"
+--           , "Melon"
+--           ]
+
+
+-- subscriptions : Model -> Sub Msg
+-- subscriptions model = Sub.none
+
+-- init : (Model, Cmd Msg)
+-- init = (Model "???", Cmd.none)
+
+-- update : Msg -> Model -> (Model, Cmd Msg)
+-- update msg model =
+--     case msg of
+--         Roll ->
+--             (model, Random.generate NewFace (Random.int 0 (List.Nonempty.length choices)))
+--         NewFace newFace ->
+--             (Model (List.Nonempty.get newFace choices), Cmd.none)
+--         _ ->
+--             (model, Cmd.none)
+
+
+-- view : Model -> Html Msg
+-- view model = div []
+--              [ h1 [] [text (model.oracleAnswer)]
+--              , button [ onClick Roll ] [ text "Consult the Oracle"]
+--              ]
+
 module Main exposing (..)
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing ( onClick )
 
--- component import example
-import Components.Hello exposing ( hello )
+import Models exposing (Model, initialModel)
+import Msgs exposing (Msg)
+import Navigation
+import Routing
+import Update
+import View
 
 
--- APP
-main : Program Never Model Msg
+init : Navigation.Location -> (Model, Cmd Msg)
+init location =
+    let currentRoute =
+            Routing.parseLocation location
+    in
+        ( initialModel currentRoute, Cmd.none )
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none
+
 main =
-  Html.beginnerProgram { model = model, view = view, update = update }
-
-
--- MODEL
-type alias Model = Int
-
-model : Model
-model = 0
-
-
--- UPDATE
-type Msg = NoOp | Increment
-
-update : Msg -> Model -> Model
-update msg model =
-  case msg of
-    NoOp -> model
-    Increment -> model + 1
-
-
--- VIEW
--- Html is defined as: elem [ attribs ][ children ]
--- CSS can be applied via class names or inline style attrib
-view : Model -> Html Msg
-view model =
-  div [ class "container", style [("margin-top", "30px"), ( "text-align", "center" )] ][    -- inline CSS (literal)
-    div [ class "row" ][
-      div [ class "col-xs-12" ][
-        div [ class "jumbotron" ][
-          img [ src "static/img/elm.jpg", style styles.img ] []                             -- inline CSS (via var)
-          , hello model                                                                     -- ext 'hello' component (takes 'model' as arg)
-          , p [] [ text ( "Elm Webpack Starter" ) ]
-          , button [ class "btn btn-primary btn-lg", onClick Increment ] [                  -- click handler
-            span[ class "glyphicon glyphicon-star" ][]                                      -- glyphicon
-            , span[][ text "FTW!" ]
-          ]
-        ]
-      ]
-    ]
-  ]
-
-
--- CSS STYLES
-styles : { img : List ( String, String ) }
-styles =
-  {
-    img =
-      [ ( "width", "33%" )
-      , ( "border", "4px solid #337AB7")
-      ]
-  }
+    Navigation.program Msgs.OnLocationChange
+        { init = init
+        , view = View.view
+        , update = Update.update
+        , subscriptions = subscriptions
+        }
