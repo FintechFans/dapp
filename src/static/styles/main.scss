@@ -1,3 +1,12 @@
 @import '~semantic-ui-css/semantic.min.css';
 
 // can add overrides, additional Sass/CSS below...
+
+.listing-item {
+    transition-duration: 0.2s;
+
+    &:hover {
+        opacity: 0.5;
+        transform: scale(1.01);
+    }
+}

@@ -1,6 +1,6 @@
 module Listings exposing (view, listing_view)
 
-import Html exposing (Html, div, text, ul, li, a, i)
+import Html exposing (Html, div, text, ul, li, a, i, span)
 import Html.Attributes exposing (href, class)
 import Html.Events exposing (onClick)
 import Msgs exposing (Msg)
@@ -18,10 +18,11 @@ listingElem listing =
     let
         path = Routing.listingPath listing.id
     in
-        linkTo path [class "event"]
+        linkTo path [class "event listing-item"]
             [ div [class "content"]
                   [ div [class "summary"]
-                        [ text listing.title
+                        [ span [class "ui green label"] [text "For Hire"]
+                        , span [] [text listing.title]
                         , div [class "date"] [text "1 day ago"]
                         ]
                   , div [class "meta"]

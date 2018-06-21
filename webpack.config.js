@@ -26,6 +26,7 @@ console.log('WEBPACK GO! Building for ' + TARGET_ENV);
 var commonConfig = {
     output: {
         path: outputPath,
+        publicPath: '/',
         filename: `static/js/${outputFilename}`,
     },
     resolve: {
@@ -62,7 +63,9 @@ if (isDev === true) {
         ],
         devServer: {
             // serve index.html in place of 404 responses
-            historyApiFallback: true,
+            historyApiFallback: {
+                index: "/index.html"
+            },
             contentBase: './src',
             hot: true
         },
