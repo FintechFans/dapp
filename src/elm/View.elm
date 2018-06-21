@@ -1,15 +1,41 @@
 module View exposing (..)
 
-import Html exposing (Html, div, text)
+import Html exposing (Html, div, text, header, footer)
+import Html.Attributes exposing (class)
 import Msgs exposing (Msg)
 import Models exposing (Model)
 import Listings
 import Dict
+import Common.ViewHelpers exposing (linkTo)
 
 view : Model -> Html Msg
 view model =
     div []
+        [ header [] [ renderHeader ]
+        , div [class "content"] [ pageWrapper model ]
+        , footer [] [ renderFooter ]
+        ]
+
+
+pageWrapper : Model -> Html Msg
+pageWrapper model =
+    div [class "ui container"]
         [ page model ]
+
+renderHeader : Html Msg
+renderHeader = div []
+         [ renderMenu
+         ]
+
+renderMenu : Html Msg
+renderMenu = div [class "ui menu"]
+             [ linkTo "/" [class "header item"] [text "FintechFans Decentralized Marketplace"]
+             , linkTo "/" [class "item"] [text "Home"]
+             ]
+
+renderFooter : Html Msg
+renderFooter = div [][]
+
 
 page : Model -> Html Msg
 page model =

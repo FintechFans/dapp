@@ -70,6 +70,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
 
+main : Program Never Model Msg
 main =
     Navigation.program Msgs.LocationChange
         { init = init
