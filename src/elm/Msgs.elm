@@ -7,3 +7,4 @@ type Msg
     | Bar
     | NavigateTo String
     | LocationChange Location
+    | EthBlockNumberKnown Int

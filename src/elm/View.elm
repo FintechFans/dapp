@@ -13,26 +13,27 @@ import Common.ViewHelpers exposing (linkTo)
 view : Model -> Html Msg
 view model =
     div []
-        [ header [] [ renderHeader ]
-        , div [class "content"] [ pageWrapper model ]
+        [ header [] [ renderHeader model ]
+        , div [class "content"] [ renderPageWrapper model ]
         , footer [] [ renderFooter ]
         ]
 
 
-pageWrapper : Model -> Html Msg
-pageWrapper model =
+renderPageWrapper : Model -> Html Msg
+renderPageWrapper model =
     div [class "ui container"]
         [ renderCurrentRoute model ]
 
-renderHeader : Html Msg
-renderHeader = div []
-         [ renderMenu
+renderHeader : Model -> Html Msg
+renderHeader model = div []
+         [ renderMenu model.ethereum_info
          ]
 
-renderMenu : Html Msg
-renderMenu = div [class "ui menu"]
+renderMenu : Models.EthereumInfo -> Html Msg
+renderMenu ethereum_info = div [class "ui menu"]
              [ linkTo "/" [class "header item"] [text "FintechFans Decentralized Marketplace"]
              , linkTo "/" [class "item"] [text "Home"]
+             , div [class "item"] [text <| "Ethereum Block Depth: " ++ ethereum_info.block_depth]
              ]
 
 renderFooter : Html Msg
