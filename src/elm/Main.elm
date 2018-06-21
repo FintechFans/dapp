@@ -71,7 +71,7 @@ subscriptions model =
     Sub.none
 
 main =
-    Navigation.program Msgs.OnLocationChange
+    Navigation.program Msgs.LocationChange
         { init = init
         , view = View.view
         , update = Update.update

@@ -3,6 +3,8 @@ module Routing exposing (..)
 import Navigation
 import Models exposing (ListingId, Route(..))
 import UrlParser exposing ((</>))
+import Html.Events
+import Json.Decode
 
 
 matchers : UrlParser.Parser (Route -> a) a
@@ -15,15 +17,16 @@ matchers =
 
 parseLocation : Navigation.Location -> Route
 parseLocation location =
-    case (UrlParser.parseHash matchers location) of
+    case (UrlParser.parsePath matchers location) of
         Just route ->
             route
         Nothing ->
             NotFoundRoute
 
+linkTo path = Html.Events.onWithOptions "click" { stopPropagation = True, preventDefault = True } (Json.Decode.succeed path)
 
 listingsPath : String
-listingsPath = "#listings"
+listingsPath = "/listings"
 
 listingPath : ListingId -> String
-listingPath listing_id = "#listings/" ++ listing_id
+listingPath listing_id = "/listings/" ++ listing_id

@@ -1,7 +1,7 @@
 module Listings exposing (view, listing_view)
 
 import Html exposing (Html, div, text, ul, li, a)
-import Html.Attributes exposing (class, href)
+import Html.Events exposing (onClick)
 import Msgs exposing (Msg)
 import Models exposing (Model, ListingId, Listing)
 import Routing
@@ -11,13 +11,13 @@ view listings =
     ul []
         (List.map listingElem listings)
 
-listingElem : Listing -> Html msg
+listingElem : Listing -> Html Msg
 listingElem listing =
     let
         path = Routing.listingPath listing.id
     in
         li []
-            [ a [href path] [text listing.title]
+            [ a [onClick (Msgs.NavigateTo path)] [text listing.title]
             ]
 
 listing_view : Listing -> Html Msg
