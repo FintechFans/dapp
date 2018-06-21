@@ -5,6 +5,7 @@ import Models exposing (ListingId, Route(..))
 import UrlParser exposing ((</>))
 import Html.Events
 import Json.Decode
+import Msgs
 
 
 matchers : UrlParser.Parser (Route -> a) a
@@ -23,7 +24,7 @@ parseLocation location =
         Nothing ->
             NotFoundRoute
 
-linkTo path = Html.Events.onWithOptions "click" { stopPropagation = True, preventDefault = True } (Json.Decode.succeed path)
+linkTo path = Html.Events.onWithOptions "click" { stopPropagation = True, preventDefault = True } (Json.Decode.succeed (Msgs.NavigateTo path))
 
 listingsPath : String
 listingsPath = "/listings"
