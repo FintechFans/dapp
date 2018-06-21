@@ -16,7 +16,6 @@
   },
   "devDependencies": {
     "autoprefixer": "^6.7.7",
-    "bootstrap-sass": "^3.3.7",
     "copy-webpack-plugin": "^4.0.1",
     "css-loader": "^0.27.3",
     "elm": "^0.18.0",
@@ -34,5 +33,8 @@
     "webpack": "^2.3.1",
     "webpack-dev-server": "^2.4.2",
     "webpack-merge": "^4.1.0"
+  },
+  "dependencies": {
+    "semantic-ui-css": "^2.3.2"
   }
 }
