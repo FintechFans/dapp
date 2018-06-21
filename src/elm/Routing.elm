@@ -16,6 +16,15 @@ matchers =
         , UrlParser.map ListingsRoute (UrlParser.s "listings")
         ]
 
+toPath route =
+    case route of
+        ListingsRoute ->
+            "/"
+        ListingRoute listing_id ->
+            "/listings/" ++ listing_id
+        NotFoundRoute ->
+            "/404"
+
 parseLocation : Navigation.Location -> Route
 parseLocation location =
     case (UrlParser.parsePath matchers location) of

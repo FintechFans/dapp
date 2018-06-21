@@ -4,14 +4,23 @@ import Html exposing (Html, div, text, ul, li, a, i, span)
 import Html.Attributes exposing (href, class)
 import Html.Events exposing (onClick)
 import Msgs exposing (Msg)
-import Models exposing (Model, ListingId, Listing)
+import Models exposing (Model, ListingId, Listing, PageContent, Route(..))
 import Routing
 import Common.ViewHelpers exposing (linkTo)
 
-view : List Listing -> Html Msg
+view : List Listing -> PageContent Msg
 view listings =
-    div [class "ui feed"]
-        (List.map listingElem listings)
+    let
+        title = text "Listings"
+        content =
+          div [class "ui feed"]
+              (List.map listingElem listings)
+    in
+        { content = content
+        , breadcrumbs = listingsBreadcrumbs
+        , title = title
+        }
+listingsBreadcrumbs = [(ListingsRoute, "Listings")]
 
 listingElem : Listing -> Html Msg
 listingElem listing =
@@ -31,9 +40,12 @@ listingElem listing =
                   ]
             ]
 
-listing_view : Listing -> Html Msg
-listing_view listing=
-    div [] [text ("TEST " ++ (listing.id))]
+listing_view : Listing -> PageContent Msg
+listing_view listing =
+        { title = text ("Listing " ++ listing.id)
+        , breadcrumbs = listingsBreadcrumbs ++ [(ListingRoute listing.id, listing.title)]
+        , content = div [] [text ("TEST " ++ (listing.id))]
+        }
 
 rating_view : Int -> Html Msg
 rating_view rat =

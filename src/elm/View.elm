@@ -1,12 +1,14 @@
 module View exposing (..)
 
-import Html exposing (Html, div, text, header, footer)
+import Html exposing (Html, div, text, header, footer, span)
 import Html.Attributes exposing (class)
 import Msgs exposing (Msg)
-import Models exposing (Model)
+import Models exposing (Model, Route, PageContent)
 import Listings
 import Dict
+import Routing
 import Common.ViewHelpers exposing (linkTo)
+
 
 view : Model -> Html Msg
 view model =
@@ -20,7 +22,7 @@ view model =
 pageWrapper : Model -> Html Msg
 pageWrapper model =
     div [class "ui container"]
-        [ page model ]
+        [ renderCurrentRoute model ]
 
 renderHeader : Html Msg
 renderHeader = div []
@@ -36,10 +38,9 @@ renderMenu = div [class "ui menu"]
 renderFooter : Html Msg
 renderFooter = div [][]
 
-
-page : Model -> Html Msg
-page model =
-    case model.route of
+renderCurrentRoute : Model -> Html Msg
+renderCurrentRoute model =
+    renderPage model.route <| case model.route of
         Models.ListingsRoute ->
             model.listings
                 |> Dict.values
@@ -53,13 +54,50 @@ page model =
                     Nothing ->
                         notFoundView
                     Just listing ->
-                        Listings.listing_view listing
+                        listing
+                            |> Listings.listing_view
         Models.NotFoundRoute ->
             notFoundView
 
-notFoundView : Html msg
-notFoundView =
-    div []
-        [text "Error: Page not found. Please check the URL and try again"
+page : String -> Html Msg -> Html Msg
+page title content =
+    div [class "pagewrapper"]
+        [ div [class "ui header"] [text title]
+        , div [class "pagewrapper-inner"] [content]
         ]
 
+renderPage : Route -> PageContent Msg -> Html Msg
+renderPage current_route page_content =
+    div [class "pagewrapper"]
+        [ div [class "ui breadcrumb"] (renderBreadcrumbs current_route page_content.breadcrumbs)
+        , div [class "ui header"] [page_content.title]
+        , div [class "pagewrapper-inner"] [page_content.content]
+        ]
+
+renderBreadcrumbs : Route -> List Models.Breadcrumb -> List (Html Msg)
+renderBreadcrumbs current_route breadcrumbs=
+    let
+        breadcrumbHtml (route, crumb_name)=
+            if route == current_route then
+                div [class "active section"] [text crumb_name]
+            else
+                linkTo (Routing.toPath route) [class "section"] [text crumb_name]
+    in
+    breadcrumbs
+        |> List.map breadcrumbHtml
+           |> List.intersperse (span [class "divider"] [text "/"])
+
+notFoundView : PageContent msg
+notFoundView =
+    let
+        title = text "Not Found"
+        breadcrumbs = [(Models.ListingsRoute, "Home")]
+        content =
+            div []
+                [text "Error: Page not found. Please check the URL and try again"
+                ]
+    in
+        { content = content
+        , breadcrumbs = breadcrumbs
+        , title = title
+        }

@@ -1,6 +1,7 @@
 module Models exposing (..)
 
 import Dict exposing (Dict)
+import Html exposing (Html)
 
 type alias Model =
     {route: Route
@@ -25,6 +26,15 @@ type Route
     = ListingsRoute
       | ListingRoute ListingId
       | NotFoundRoute
+
+
+type alias PageContent msg =
+    { title : Html msg
+    , breadcrumbs : List Breadcrumb
+    , content : Html msg
+    }
+
+type alias Breadcrumb = (Route, String)
 
 type alias ListingId = String
 
