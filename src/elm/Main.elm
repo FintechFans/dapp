@@ -10,6 +10,7 @@ import Eth
 import Task
 import Web3
 import Porter
+import Debug
 
 
 init : Navigation.Location -> (Model, Cmd Msg)
@@ -22,12 +23,25 @@ init location =
                 |> Task.onError (\err -> Debug.log (toString err) (Task.succeed 0))
                 |> Task.perform Msgs.EthBlockNumberKnown
         porter_send_text =
-            Porter.send Msgs.Foo "Some Text" |> Cmd.map Msgs.Web3Msg
+            Porter.sendEffectful do_something "Some Text"
+            |> Task.andThen(\res -> Porter.sendEffectful (Cmd.map Msgs.Foo) ("Some Text2" ++ res))
+                |> Cmd.map Msgs.Web3Msg
     in
         model !
             [ eth_task
             , porter_send_text
             ]
+
+do_something res =
+    res
+        -- |> Task.succeed
+        -- |> Task.andThen (Porter.sendEffectful do_something2 ("Some More Text" ++ res))
+        -- |> Task.perform (Cmd.map Msgs.Web3Msg)
+    -- Task.perform Msgs.Foo (Task.succeed res)
+    -- Msgs.Foo res
+
+do_something2 res =
+    Msgs.Foo res
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
