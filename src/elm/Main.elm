@@ -9,7 +9,7 @@ import View
 import Eth
 import Task
 import Web3
-import Porter
+-- import Porter
 import Debug
 
 
@@ -23,9 +23,13 @@ init location =
                 |> Task.onError (\err -> Debug.log (toString err) (Task.succeed 0))
                 |> Task.perform Msgs.EthBlockNumberKnown
         porter_send_text =
-            Porter.sendEffectful do_something "Some Text"
-            |> Task.andThen(\res -> Porter.sendEffectful (Cmd.map Msgs.Foo) ("Some Text2" ++ res))
-                |> Cmd.map Msgs.Web3Msg
+            -- Web3.send Msgs.Foo "Some text"
+            -- Porter.sendEffectful (Cmd.map Msgs.Foo) "Some text"
+            --     |> Task.perform Cmd.map Msgs.Web3Msg
+            -- Porter.sendEffectful do_something "Some Text"
+            -- |> Task.andThen(\res -> Porter.sendEffectful (Cmd.map Msgs.Foo) ("Some Text2" ++ res))
+            --     |> Cmd.map Msgs.Web3Msg
+            Web3.netVersion Msgs.NetVersion
     in
         model !
             [ eth_task
@@ -45,7 +49,7 @@ do_something2 res =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Web3.porter_subscriptions
+    Web3.subscriptions
 
 main : Program Never Model Msg
 main =

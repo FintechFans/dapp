@@ -16,11 +16,15 @@ update msg model =
             updateLocationChange location model
         Msgs.EthBlockNumberKnown block_number ->
             updateBlockNumber block_number model
-        Msgs.Web3Msg porter_msg ->
-            Web3.porter_update porter_msg model
-        other ->
-            Debug.log ("TEST" ++ (toString other)) <|
-            ( model, Cmd.none )
+        Msgs.Web3Msg web3_msg ->
+            Web3.update web3_msg model
+        Msgs.NetVersion version_num ->
+            Debug.log ("version num:" ++ (toString version_num))
+                <| (model, Cmd.none)
+        Msgs.Foo stuff ->
+            Debug.log ("Foo:" ++ (toString stuff))
+            (model, Cmd.none)
+
 
 updateLocationChange location model =
             let
@@ -28,6 +32,7 @@ updateLocationChange location model =
                     Routing.parseLocation location
             in
                 ( { model | route = newRoute }, Cmd.none )
+
 
 updateBlockNumber block_number model =
             let
