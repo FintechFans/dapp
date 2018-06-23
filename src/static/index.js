@@ -5,4 +5,18 @@ require( '../../node_modules/semantic-ui-css/semantic.min.js' );   // <--- remov
 
 // inject bundled Elm app into div#main
 var Elm = require( '../elm/Main' );
-Elm.Main.embed( document.getElementById( 'main' ) );
+const app = Elm.Main.embed( document.getElementById( 'main' ) );
+
+console.log(app);
+
+app.ports.outgoing.subscribe(msg_with_id => {
+    const id = msg_with_id.id;
+    const request = msg_with_id.msg;
+    console.log("RECEIVED MESSAGE: ", msg_with_id);
+    response = "The quick brown fox!";
+
+    app.ports.incoming.send({
+        id: id,
+        msg: response
+    });
+});

@@ -4,11 +4,14 @@ import Dict exposing (Dict)
 import Html exposing (Html)
 
 import Eth.Types
+import Porter
+import Msgs exposing (Msg)
 
 type alias Model =
-    {route: Route
+    { route: Route
     , listings : (Dict String Listing)
     , ethereum_info : EthereumInfo
+    , web3_porter : Porter.Model String String Msg
     }
 
 type alias EthereumInfo =
@@ -21,6 +24,7 @@ initialModel route =
     { route = route
     , listings = initial_listings
     , ethereum_info = initial_ethereum_info
+    , web3_porter = Porter.init
     }
 
 initial_listings : Dict String Listing

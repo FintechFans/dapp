@@ -4,6 +4,8 @@ import Models exposing (Model)
 import Msgs exposing (Msg)
 import Routing
 import Navigation
+import Web3
+import Porter
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -14,8 +16,10 @@ update msg model =
             updateLocationChange location model
         Msgs.EthBlockNumberKnown block_number ->
             updateBlockNumber block_number model
+        Msgs.Web3Msg porter_msg ->
+            Web3.porter_update porter_msg model
         other ->
-            Debug.log (toString other) <|
+            Debug.log ("TEST" ++ (toString other)) <|
             ( model, Cmd.none )
 
 updateLocationChange location model =
