@@ -18,7 +18,7 @@ app.ports.outgoing.subscribe(function(msg_with_id) {
             console.log("Web3 Response error", err);
         } else {
             console.log("WEB3 Response:", response);
-            app.ports.incoming.send({id: msg_with_id.id, msg: response.result});
+            app.ports.incoming.send({id: msg_with_id.id, msg: response});
         }
     });
     // const id = msg_with_id.id;

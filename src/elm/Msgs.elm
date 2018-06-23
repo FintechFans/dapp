@@ -7,7 +7,7 @@ import Web3.Types
 
 type Msg
     = Foo String
-    | NetVersion Int
+    | NetVersion String
     | NavigateTo String
     | LocationChange Location
     | EthBlockNumberKnown Int

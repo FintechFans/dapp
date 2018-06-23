@@ -4,18 +4,18 @@ import Json.Encode as Encode
 import Json.Decode as Decode
 import Porter
 import Msgs exposing (Msg)
-import Web3.Types exposing (Web3RPCCall)
+import Web3.Types exposing (Web3RPCCall, Web3RPCResponse)
 
 port outgoing : Encode.Value -> Cmd msg
 port incoming : (Decode.Value -> msg) -> Sub msg
 
 
-porterConfig : Porter.Config Web3RPCCall String Msg
+porterConfig : Porter.Config Web3RPCCall Web3RPCResponse Msg
 porterConfig =
     { outgoingPort = outgoing
     , incomingPort = incoming
     , encodeRequest = web3_call_encode
-    , decodeResponse = Decode.string
+    , decodeResponse = web3_call_decode
     }
 
 
@@ -26,6 +26,10 @@ web3_call_encode web3_rpc_call =
         , ("method", Encode.string web3_rpc_call.method)
         , ("params", web3_rpc_call.params |> List.map Encode.string |> Encode.list)
         ]
+
+web3_call_decode =
+    Decode.field "result" Decode.value
+        |> Decode.map Web3RPCResponse
 
 
 subscriptions : Sub Msg
@@ -56,14 +60,15 @@ sendMessage response_handler text =
         send response_handler request
 
 
-netVersion : (Int -> Msg) -> Cmd Msg
+netVersion : (String -> Msg) -> Cmd Msg
 netVersion response_handler =
     let
         response_wrapper res =
             res
+                |> .result
                 |> Debug.log "RESPONSE WRAPPER"
-                |> Decode.decodeString (Decode.int)
-                |> Result.withDefault -1
+                |> Decode.decodeValue (Decode.string)
+                |> Result.withDefault "-1"
                 |> response_handler
     in
         send (response_wrapper) {method = "net_version", params = []}

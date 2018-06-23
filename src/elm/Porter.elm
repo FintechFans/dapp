@@ -1,4 +1,4 @@
-module Porter exposing (Model, Config, Msg, subscriptions, init, update, send, sendEffectful)
+module Porter exposing (Model, Config, Msg, subscriptions, init, update, send)
 
 {-| Port message manager to emulate a request-response style communication through ports, a'la `Http.send ResponseHandler request`.
 
@@ -59,7 +59,7 @@ init =
 
 
 type alias ResponseHandlerMap res msg =
-    Dict.Dict MsgId (res -> Cmd msg)
+    Dict.Dict MsgId (res -> msg)
 
 
 encode : (req -> Encode.Value) -> MsgId -> req -> Encode.Value
@@ -73,7 +73,7 @@ encode encodeReq id msg =
 {-| Module messages.
 -}
 type Msg req res msg
-    = SendWithNextId (res -> Cmd msg) req
+    = SendWithNextId (res -> msg) req
     | Receive Encode.Value
 
 
@@ -88,22 +88,9 @@ subscriptions config =
 -}
 send : (res -> msg) -> req -> Cmd (Msg req res msg)
 send responseHandler msg =
-    let
-        responseHandlerWrapper =
-            \res -> Task.perform responseHandler (Task.succeed res)
-    in
-        sendEffectful responseHandlerWrapper msg
-            |> Task.perform identity
-
-
-{-| Initiate a message send that is effectful,
-meaning that you can chain other `Cmd`-producing functions like tasks
-as its response handler, rather than returning a `msg` right away.
--}
-sendEffectful : (res -> Cmd msg) -> req -> Task.Task x (Msg req res msg)
-sendEffectful responseHandler msg =
     SendWithNextId responseHandler msg
         |> Task.succeed
+        |> Task.perform identity
 
 
 {-| In theory, Elm Ints can go as high as 2^53, but it's safer in the long
@@ -166,8 +153,7 @@ update config msg (Model model) =
                             |> Maybe.map
                                 (\handleResponse ->
                                     ( Model { model | handlers = Dict.remove id model.handlers }
-                                    -- , Task.perform handleResponse (Task.succeed res)
-                                    , handleResponse res
+                                    , Task.perform handleResponse (Task.succeed res)
                                     )
                                 )
                             |> Maybe.withDefault ( Model model, Cmd.none )
