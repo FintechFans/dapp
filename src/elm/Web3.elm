@@ -72,3 +72,16 @@ netVersion response_handler =
                 |> response_handler
     in
         send (response_wrapper) {method = "net_version", params = []}
+
+netListening : (Bool -> Msg) -> Cmd Msg
+netListening response_handler =
+    let
+        response_wrapper res =
+            res
+                |> .result
+                   |> Debug.log "RESPONSE WRAPPER?"
+                   |> Decode.decodeValue (Decode.bool)
+                   |> Result.withDefault False
+                   |> response_handler
+    in
+        send (response_wrapper) {method = "net_listening", params = []}

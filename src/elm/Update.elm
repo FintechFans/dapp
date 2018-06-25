@@ -21,6 +21,9 @@ update msg model =
         Msgs.NetVersion version_num ->
             Debug.log ("version num:" ++ (toString version_num))
                 <| (model, Cmd.none)
+        Msgs.NetListening is_listening ->
+            Debug.log ("net_listening: " ++ (toString is_listening))
+                <| (model, Cmd.none)
         Msgs.Foo stuff ->
             Debug.log ("Foo:" ++ (toString stuff))
             (model, Cmd.none)

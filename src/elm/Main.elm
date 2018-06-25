@@ -22,18 +22,19 @@ init location =
             (Eth.getBlockNumber model.ethereum_info.provider)
                 |> Task.onError (\err -> Debug.log (toString err) (Task.succeed 0))
                 |> Task.perform Msgs.EthBlockNumberKnown
-        porter_send_text =
+        -- porter_send_text =
             -- Web3.send Msgs.Foo "Some text"
             -- Porter.sendEffectful (Cmd.map Msgs.Foo) "Some text"
             --     |> Task.perform Cmd.map Msgs.Web3Msg
             -- Porter.sendEffectful do_something "Some Text"
             -- |> Task.andThen(\res -> Porter.sendEffectful (Cmd.map Msgs.Foo) ("Some Text2" ++ res))
             --     |> Cmd.map Msgs.Web3Msg
-            Web3.netVersion Msgs.NetVersion
+            -- Web3.netListening Msgs.NetListening
     in
         model !
             [ eth_task
-            , porter_send_text
+            , Web3.netVersion Msgs.NetVersion
+            , Web3.netListening Msgs.NetListening
             ]
 
 do_something res =
