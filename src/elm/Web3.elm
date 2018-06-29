@@ -62,85 +62,41 @@ request : Web3RPCCall -> (Web3RPCResponse -> (Result Error res)) -> Request res
 request call_info request_handler =
     Porter.fancyRequest call_info request_handler
 
-decodeResult : (Decode.Decoder res) -> Web3RPCResponse -> Result Error res
-decodeResult decoder response =
-    case response of
-        SuccessfulResponse val ->
-            val
-                |> Debug.log "decodeResult Start!"
-                |> Decode.decodeValue decoder
-                |> Result.mapError Web3.Types.ResultParseError
-                |> Debug.log "decodeResult Finish!"
-        ErrorResponse -32700 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerParseError str)
-        ErrorResponse -32600 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerInvalidRequest str)
-        ErrorResponse -32601 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerMethodNotFound str)
-        ErrorResponse -32602 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerInvalidParams str)
-        ErrorResponse -32603 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerInternalError str)
-        ErrorResponse code str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerError code str)
-
-clientVersion : Request String
-clientVersion =
-    request {method = "web3_clientVersion", params = []} (decodeResult Decode.string)
-
-netVersion : Request String
-netVersion =
-    request {method = "net_version", params = []} (decodeResult Decode.string)
-
-netListening : Request Bool
-netListening =
-    request {method = "net_listening", params = []} (decodeResult Decode.bool)
-
 send : Config msg -> (Result Error res -> msg) -> Request res -> Cmd msg
 send config msg_handler req =
     Porter.send config msg_handler req
 
--- send response_handler request =
-    -- Porter.send (\res -> res |> Debug.log "TEST" |> response_handler) (Porter.request  request)
+decodeJSONRPCResult : (Decode.Decoder res) -> Web3RPCResponse -> Result Error res
+decodeJSONRPCResult decoder response =
+    case response of
+        SuccessfulResponse val ->
+            val
+                |> Debug.log "decodeJSONRPCResult Start!"
+                |> Decode.decodeValue decoder
+                |> Result.mapError Web3.Types.ResultParseError
+                |> Debug.log "decodeJSONRPCResult Finish!"
+        ErrorResponse -32700 str -> Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerParseError str)
+        ErrorResponse -32600 str -> Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerInvalidRequest str)
+        ErrorResponse -32601 str -> Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerMethodNotFound str)
+        ErrorResponse -32602 str -> Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerInvalidParams str)
+        ErrorResponse -32603 str -> Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerInternalError str)
+        ErrorResponse code str -> Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerError code str)
 
+clientVersion : Request String
+clientVersion =
+    request {method = "web3_clientVersionX", params = []} (decodeJSONRPCResult Decode.string)
 
--- sendMessage response_handler text =
---     let
---         request =
---             { method = "fake_message"
---             , params = [text]
---             }
---     in
---         send response_handler request
+netVersion : Request String
+netVersion =
+    request {method = "net_version", params = []} (decodeJSONRPCResult Decode.string)
 
+netListening : Request Bool
+netListening =
+    request {method = "net_listening", params = []} (decodeJSONRPCResult Decode.bool)
 
--- netVersion : (String -> Msg) -> Cmd Msg
--- netVersion response_handler =
---     let
---         response_wrapper res =
---             res
---                 |> .result
---                 |> Decode.decodeValue (Decode.string)
---                 |> Result.withDefault "-1"
---                 |> response_handler
---     in
---         send (response_wrapper) {method = "net_version", params = []}
+decodeHexInt : Decode.Decoder Int
+decodeHexInt =
+    Decode.map (\x -> 42) Decode.string
 
--- netListening : (Bool -> Msg) -> Cmd Msg
--- netListening response_handler =
---     let
---         response_wrapper res =
---             res
---                 |> .result
---                    |> Decode.decodeValue (Decode.bool)
---                    |> Result.withDefault False
---                    |> response_handler
---     in
---         send (response_wrapper) {method = "net_listening", params = []}
-
--- clientVersion : (String -> Msg) -> Cmd Msg
--- clientVersion response_handler =
---     let
---         response_wrapper res =
---             res
---                 |> .result
---                 |> Decode.decodeValue (Decode.string)
---                 |> Result.withDefault "?"
---                 |> response_handler
---     in
---         send (response_wrapper) {method = "web3_clientVersion", params = []}
-
+netPeerCount : Request Int
+netPeerCount = request {method = "net_peerCount", params = []} (decodeJSONRPCResult decodeHexInt)

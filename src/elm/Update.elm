@@ -33,6 +33,11 @@ update msg model =
                 _ = Debug.log ("net_listening: " ++ (toString is_listening)) ()
             in
                 (model, Cmd.none)
+        Msgs.NetPeerCount count ->
+            let
+                _ = Debug.log ("net_peerCount: " ++ (toString count)) ()
+            in
+                (model, Cmd.none)
         Msgs.Foo stuff ->
             Debug.log ("Foo:" ++ (toString stuff))
             (model, Cmd.none)
