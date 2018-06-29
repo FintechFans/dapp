@@ -33,9 +33,9 @@ init location =
     in
         model !
             [ eth_task
-            , Web3.netVersion Msgs.NetVersion
-            , Web3.netListening Msgs.NetListening
-            , Web3.clientVersion Msgs.ClientVersion
+            , Web3.netVersion |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault "" |> Debug.log "netVersion" |> Msgs.NetVersion)
+            , Web3.netListening |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault False |> Debug.log "netListening" |> Msgs.NetListening)
+            , Web3.clientVersion |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault "" |> Debug.log "clientVersion" |> Msgs.ClientVersion)
             ]
 
 do_something res =

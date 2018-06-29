@@ -55,6 +55,11 @@ decodeResult decoder response =
     response
         |> .result
         |> Decode.decodeValue decoder
+        |> Debug.log "decodeResult!"
+
+clientVersion : Request String
+clientVersion =
+    request {method = "web3_clientVersion", params = []} (decodeResult Decode.string)
 
 netVersion : Request String
 netVersion =

@@ -20,17 +20,17 @@ update msg model =
             Web3.update web3_msg model
         Msgs.NetVersion version_num ->
             let
-                _ = Debug.log ("version num:" ++ (toString version_num)) ()
+                _ = Debug.log ("version num: " ++ (toString version_num)) ()
             in
                 (model, Cmd.none)
         Msgs.ClientVersion version_str ->
             let
-                _ = Debug.log ("client version: " ++ (toString version_str))
+                _ = Debug.log ("client version: " ++ (toString version_str)) ()
             in
                 (model, Cmd.none)
         Msgs.NetListening is_listening ->
             let
-                _ = Debug.log ("net_listening: " ++ (toString is_listening))
+                _ = Debug.log ("net_listening: " ++ (toString is_listening)) ()
             in
                 (model, Cmd.none)
         Msgs.Foo stuff ->
