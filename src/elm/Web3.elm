@@ -4,7 +4,7 @@ import Json.Encode as Encode
 import Json.Decode as Decode
 import Porter
 import Msgs exposing (Msg)
-import Web3.Types exposing (Web3RPCCall, Web3RPCResponse, Request, Config)
+import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error)
 
 port outgoing : Encode.Value -> Cmd msg
 port incoming : (Decode.Value -> msg) -> Sub msg
@@ -28,9 +28,21 @@ web3_call_encode web3_rpc_call =
         , ("params", web3_rpc_call.params |> List.map Encode.string |> Encode.list)
         ]
 
+web3_call_decode : Decode.Decoder Web3RPCResponse
 web3_call_decode =
-    Decode.field "result" Decode.value
-        |> Decode.map Web3RPCResponse
+    let
+        successful_response_decoder =
+            Decode.field "result" Decode.value
+                |> Decode.map SuccessfulResponse
+        error_response_decoder =
+            Decode.field "error" <|
+            Decode.map2 ErrorResponse
+                (Decode.field "code" Decode.int)
+                (Decode.field "message" Decode.string)
+    in
+        Decode.oneOf [ successful_response_decoder
+                     , error_response_decoder
+                     ]
 
 
 subscriptions : Sub Msg
@@ -46,16 +58,25 @@ update porter_msg model =
                 -- Debug.log (toString porter_msg)
                     ({ model | web3_porter = porter_model }, porter_cmd)
 
-request : Web3RPCCall -> (Web3RPCResponse -> (Result String res)) -> Request res
+request : Web3RPCCall -> (Web3RPCResponse -> (Result Error res)) -> Request res
 request call_info request_handler =
     Porter.fancyRequest call_info request_handler
 
-decodeResult : (Decode.Decoder res) -> Web3RPCResponse -> Result String res
+decodeResult : (Decode.Decoder res) -> Web3RPCResponse -> Result Error res
 decodeResult decoder response =
-    response
-        |> .result
-        |> Decode.decodeValue decoder
-        |> Debug.log "decodeResult!"
+    case response of
+        SuccessfulResponse val ->
+            val
+                |> Debug.log "decodeResult Start!"
+                |> Decode.decodeValue decoder
+                |> Result.mapError Web3.Types.ResultParseError
+                |> Debug.log "decodeResult Finish!"
+        ErrorResponse -32700 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerParseError str)
+        ErrorResponse -32600 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerInvalidRequest str)
+        ErrorResponse -32601 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerMethodNotFound str)
+        ErrorResponse -32602 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerInvalidParams str)
+        ErrorResponse -32603 str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerInternalError str)
+        ErrorResponse code str -> Debug.log "decodeResult error case!" <| Result.Err (Web3.Types.ServerError code str)
 
 clientVersion : Request String
 clientVersion =
@@ -69,10 +90,10 @@ netListening : Request Bool
 netListening =
     request {method = "net_listening", params = []} (decodeResult Decode.bool)
 
-send : Config msg -> (Result String res -> msg) -> Request res -> Cmd msg
+send : Config msg -> (Result Error res -> msg) -> Request res -> Cmd msg
 send config msg_handler req =
     Porter.send config msg_handler req
- 
+
 -- send response_handler request =
     -- Porter.send (\res -> res |> Debug.log "TEST" |> response_handler) (Porter.request  request)
 

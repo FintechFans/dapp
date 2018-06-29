@@ -15,7 +15,8 @@ app.ports.outgoing.subscribe(function(msg_with_id) {
     console.log(msg_with_id);
     web3.currentProvider.sendAsync(msg, function(err, response) {
         if (err) {
-            // console.log("Web3 Response error", err);
+            console.log("Web3 Response error", err);
+            app.ports.incoming.send({id: msg_with_id.id, msg: err});
         } else {
             console.log("WEB3 Response:", response);
             app.ports.incoming.send({id: msg_with_id.id, msg: response});

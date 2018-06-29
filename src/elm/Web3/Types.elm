@@ -5,32 +5,59 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 
 
+type alias Model msg_type =
+    Porter.Model Web3RPCCall Web3RPCResponse msg_type
 
-type alias Model msg_type = Porter.Model Web3RPCCall Web3RPCResponse msg_type
 
 type alias Web3RPCCall =
     { method : String
-    , params: List String
+    , params : List String
     }
 
-type alias Web3RPCResponse =
-    { result: Decode.Value
-    }
 
-type alias Request res = Porter.RequestWithHandler Web3RPCCall Web3RPCResponse (Result String res)
+type Web3RPCResponse
+    = SuccessfulResponse Decode.Value
+    | ErrorResponse Int String
 
-type alias Message msg = Porter.Msg Web3RPCCall Web3RPCResponse msg
 
-type alias Config msg = Porter.Config Web3RPCCall Web3RPCResponse msg
+type alias Request res =
+    Porter.RequestWithHandler Web3RPCCall Web3RPCResponse (Result Error res)
 
-init = Porter.init
 
-{-| TODO Fill in known networks here -}
-type alias NetworkVersion = Int
+type alias Message msg =
+    Porter.Msg Web3RPCCall Web3RPCResponse msg
+
+
+type alias Config msg =
+    Porter.Config Web3RPCCall Web3RPCResponse msg
+
+
+type Error
+    = ServerError Int String
+    | ServerParseError String
+    | ServerInvalidRequest String
+    | ServerMethodNotFound String
+    | ServerInvalidParams String
+    | ServerInternalError String
+    | ResultParseError String
+
+
+init : Model msg
+init =
+    Porter.init
+
+
+{-| TODO Fill in known networks here
+-}
+type alias NetworkVersion =
+    Int
+
 
 {-| A type representing the kind of software your client is running
- -}
-type alias ClientVersion = String
+-}
+type alias ClientVersion =
+    String
+
 
 {-| Used for the following requests:
 
@@ -40,6 +67,11 @@ type alias ClientVersion = String
   - eth_getStorageAt
   - eth_call
 
-See https://github.com/ethereum/wiki/wiki/JSON-RPC#the-default-block-parameter
- -}
-type BlockParameter = Hex Int | Earliest | Latest | Pending
+See <https://github.com/ethereum/wiki/wiki/JSON-RPC#the-default-block-parameter>
+
+-}
+type BlockParameter
+    = Hex Int
+    | Earliest
+    | Latest
+    | Pending
