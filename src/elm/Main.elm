@@ -35,6 +35,7 @@ init location =
             [ eth_task
             , Web3.netVersion Msgs.NetVersion
             , Web3.netListening Msgs.NetListening
+            , Web3.clientVersion Msgs.ClientVersion
             ]
 
 do_something res =

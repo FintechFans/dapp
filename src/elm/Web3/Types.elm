@@ -1,7 +1,8 @@
 module Web3.Types exposing (..)
 
 import Porter
-import Json.Decode
+import Json.Decode as Decode
+import Json.Encode as Encode
 
 
 
@@ -13,11 +14,14 @@ type alias Web3RPCCall =
     }
 
 type alias Web3RPCResponse =
-    { result: Json.Decode.Value
+    { result: Decode.Value
     }
 
+type alias Request res = Porter.RequestWithHandler Web3RPCCall Web3RPCResponse (Result String res)
 
-type alias Message msg_type = Porter.Msg Web3RPCCall Web3RPCResponse msg_type
+type alias Message msg = Porter.Msg Web3RPCCall Web3RPCResponse msg
+
+type alias Config msg = Porter.Config Web3RPCCall Web3RPCResponse msg
 
 init = Porter.init
 
