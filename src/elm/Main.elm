@@ -47,6 +47,7 @@ init location =
               , Web3.clientVersion |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault "" |> Msgs.PrintDebug "clientVersion")
               , Web3.ethGasPrice |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> BigInt.toString |> Msgs.PrintDebug "ethGasPrice")
               , Web3.netPeerCount |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> BigInt.toString |> Msgs.PrintDebug "netPeerCount")
+              , Web3.ethAccounts |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault [] |> toString |> Msgs.PrintDebug "ethAccounts")
               ]
 
 

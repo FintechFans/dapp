@@ -245,7 +245,6 @@ update config msg (Model model) =
                 |> Result.map
                     (\( id, res ) ->
                         Dict.get id model.handlers
-                            |> Debug.log ("Porter Receive RESULT")
                             |> Maybe.map (handleResponse config (Model model) id res)
                             |> Maybe.withDefault ( Model model, Cmd.none )
                     )

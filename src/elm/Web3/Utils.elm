@@ -1,56 +1,58 @@
 module Web3.Utils exposing (..)
 
 import Result
-import Web3.Types exposing (Error)
+import Web3.Types exposing (Error, Address(..))
 import Hex
 import Char
 import BigInt exposing (BigInt)
 import List.Extra
 import Result.Extra
 
+
 {-| Used to transform a hexadecimal-encoded quantity into an Elm integer.
 
 Will return Err if:
 
-- hex string does not start with '0x'
-- hex string contains non-hexadecimal values (0-9, a-f; uppercase A-F are not recognized!)
+  - hex string does not start with '0x'
+  - hex string contains non-hexadecimal values (0-9, a-f; uppercase A-F are not recognized!)
 
 TODO Will probably be deprecated, since using BigInts is safer.
- -}
-hexQuantityToInt : String -> Result Error Int
+
+-}
+hexQuantityToInt : String -> Result String Int
 hexQuantityToInt quantity =
     quantity
         |> stripPrefix0x
         |> Result.andThen Hex.fromString
-        |> Result.mapError Web3.Types.ResultParseError
 
 
 {-| Used to transform a hexadecimal-encoded quantity into a BigInt.
 
 Will return Err if:
 
-- hex string does not start with '0x'
-- hex string contains non-hexadecimal values (0-9, a-f; uppercase A-F are not recognized!)
+  - hex string does not start with '0x'
+  - hex string contains non-hexadecimal values (0-9, a-f; uppercase A-F are not recognized!)
 
- -}
-hexQuantityToBigInt : String -> Result Error BigInt
+-}
+hexQuantityToBigInt : String -> Result String BigInt
 hexQuantityToBigInt quantity =
     if not (String.startsWith "0x" quantity) then
-        Result.Err (Web3.Types.ResultParseError "Hexadecimal quantities are expected to begin with 0x")
+        Result.Err "Hexadecimal quantities are expected to begin with 0x"
     else
         quantity
             |> BigInt.fromString
-            |> Result.fromMaybe (Web3.Types.ResultParseError "Could not parse response as hexadecimal BigInt")
+            |> Result.fromMaybe "Could not parse response as hexadecimal BigInt"
 
 
 {-| Used to transform quantities (BigInteger numbers representing amounts, balances, timestamps, block numbers etc) into their hexadecimal format.
 
 Will return Err if:
 
-- hex string does not start with '0x'
-- hex string contains non-hexadecimal values (0-9, a-f; uppercase A-F are not recognized!)
+  - hex string does not start with '0x'
+  - hex string contains non-hexadecimal values (0-9, a-f; uppercase A-F are not recognized!)
 
 TODO Will probably be deprecated, since using BigInts is safer.
+
 -}
 intToHexQuantity : Int -> String
 intToHexQuantity quantity =
@@ -58,14 +60,17 @@ intToHexQuantity quantity =
         |> Hex.toString
         |> prefix0x
 
+
 {-| Used to transform quantities (BigInteger numbers representing amounts, balances, timestamps, block numbers etc) into their hexadecimal format.
 
 TODO negative numbers! (non-encodable in Ethereum)
 
+
 ### Example
 
     bigIntToHexQuantity (BigInt.fromInt 10) == "0xa"
- -}
+
+-}
 bigIntToHexQuantity : BigInt -> String
 bigIntToHexQuantity quantity =
     quantity
@@ -103,6 +108,7 @@ prefix0x value =
 
 If it does not, an Error is returned.
 If it does, this prefix is stripped, and Ok String is returned.
+
 -}
 stripPrefix0x : String -> Result String String
 stripPrefix0x str =
@@ -116,7 +122,7 @@ stripPrefix0x str =
 
 {-| Turns a hexadecimal string like "0x666f6f" back into its String equivalent (in this case: "foo").
 
-Returns error if:
+Returns Err if:
 
   - hexString does not start with '0x'
   - hexString contains non-hexadecimal characters (outside the 0-9, a-f range; capital A-F is not recognized!)
@@ -127,7 +133,7 @@ Returns error if:
     hexStringToUnformattedData "0x666f6f" == Ok "foo"
 
 -}
-hexStringToUnformattedData : String -> Result Error String
+hexStringToUnformattedData : String -> Result String String
 hexStringToUnformattedData input =
     let
         unsafeFun stripped_input =
@@ -141,4 +147,28 @@ hexStringToUnformattedData input =
         input
             |> stripPrefix0x
             |> Result.andThen unsafeFun
-            |> Result.mapError Web3.Types.ResultParseError
+
+
+{-| Attempts to turn a hexadecimal string into an Ethereum Address
+
+Returns Err if:
+
+  - Not hexadecimal
+  - Not 20 bytes long.
+
+-}
+hexStringToAddress : String -> Result String Address
+hexStringToAddress input =
+    let
+        isAddress str =
+            String.length str == 20
+    in
+        input
+            |> hexStringToUnformattedData
+            |> Result.andThen
+                (\x ->
+                    if isAddress x then
+                        Ok (Address input)
+                    else
+                        Err ("Passed hexadecimal string was not an address (not 20 bytes long)")
+                )

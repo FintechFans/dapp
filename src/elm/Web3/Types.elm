@@ -85,3 +85,5 @@ type BlockParameter
     | Earliest
     | Latest
     | Pending
+
+type Address = Address String
