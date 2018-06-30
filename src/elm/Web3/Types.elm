@@ -31,14 +31,25 @@ type alias Config msg =
     Porter.Config Web3RPCCall Web3RPCResponse msg
 
 
+{-| Errors we might encounter when performing calls:
+ - Server (or network)-related errors,
+ - Errors related to the parsing of RPC responses.
+ -}
 type Error
-    = ServerError Int String
-    | ServerParseError String
-    | ServerInvalidRequest String
-    | ServerMethodNotFound String
-    | ServerInvalidParams String
-    | ServerInternalError String
+    = ServerError JSONRPCError
     | ResultParseError String
+
+{-| The various types of errors that a JSON-RPC server might return with.
+ This library maps the standardized error codes to these readable instances;
+ non-standard error codes are mapped to 'UnknownError' which will contain the code in there.
+ -}
+type JSONRPCError
+    = UnknownError Int String
+    | ParseError String
+    | InvalidRequest String
+    | MethodNotFound String
+    | InvalidParams String
+    | InternalError String
 
 
 init : Model msg
