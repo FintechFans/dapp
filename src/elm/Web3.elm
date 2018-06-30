@@ -143,3 +143,14 @@ netPeerCount =
                 |> Result.andThen Web3.Utils.hexQuantityToBigInt
     in
         request { method = "net_peerCount", params = [] } responseHandler
+
+web3Sha3 : String -> Request String
+web3Sha3 str =
+    let
+        hexstring = str |> Web3.Utils.unformattedDataToHexString
+        responseHandler res =
+            res
+                |> decodeJSONRPCResult Decode.string
+                |> Result.andThen Web3.Utils.hexStringToUnformattedData
+    in
+        request { method = "web3_sha3", params = [hexstring] } responseHandler

@@ -60,7 +60,7 @@ intToHexQuantity quantity =
 
 {-| Used to transform quantities (BigInteger numbers representing amounts, balances, timestamps, block numbers etc) into their hexadecimal format.
 
-TODO negative numbers! (which are non-encodable in Ethereum)
+TODO negative numbers! (non-encodable in Ethereum)
 
 ### Example
 
@@ -127,7 +127,7 @@ Returns error if:
     hexStringToUnformattedData "0x666f6f" == Ok "foo"
 
 -}
-hexStringToUnformattedData : String -> Result String String
+hexStringToUnformattedData : String -> Result Error String
 hexStringToUnformattedData input =
     let
         unsafeFun stripped_input =
@@ -141,3 +141,4 @@ hexStringToUnformattedData input =
         input
             |> stripPrefix0x
             |> Result.andThen unsafeFun
+            |> Result.mapError Web3.Types.ResultParseError
