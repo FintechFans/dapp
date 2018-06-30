@@ -3,12 +3,10 @@ port module Web3 exposing (..)
 import Json.Encode as Encode
 import Json.Decode as Decode
 import Porter
+import BigInt exposing (BigInt)
 import Msgs exposing (Msg)
 import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash)
 import Web3.Utils
-import BigInt exposing (BigInt)
-import Result.Extra
-import Json.Decode.Extra as DecodeExtra
 import Web3.Decode
 
 
@@ -18,13 +16,13 @@ port outgoing : Encode.Value -> Cmd msg
 port incoming : (Decode.Value -> msg) -> Sub msg
 
 
-porterConfig : Config Msg
-porterConfig =
+porterConfig : (Web3.Types.Message msg -> msg) -> Config msg
+porterConfig web3_msg =
     { outgoingPort = outgoing
     , incomingPort = incoming
     , encodeRequest = web3_call_encoder
     , decodeResponse = web3_call_decoder
-    , porterMsg = Msgs.Web3Msg
+    , porterMsg = web3_msg
     }
 
 
@@ -62,17 +60,18 @@ web3_call_decoder =
 
 {-| Should be added to your application so Web3 is able to listen to incoming responses from the JS web3 library.
 -}
-subscriptions : Sub Msg
-subscriptions =
-    Porter.subscriptions porterConfig
+subscriptions : Config msg -> Sub msg
+subscriptions config =
+    Porter.subscriptions config
 
 
 {-| Should be added to your application so Web3 is able to chain requests/responses made using its library.
 -}
-update porter_msg model =
+update : Config msg -> msg -> {web3_porter : Porter.Model} -> (a, Cmd msg)
+update config incoming_msg model =
     let
         ( porter_model, porter_cmd ) =
-            Porter.update porterConfig porter_msg model.web3_porter
+            Porter.update config incoming_msg model.web3_porter
     in
         -- Debug.log (toString porter_msg)
         ( { model | web3_porter = porter_model }, porter_cmd )

@@ -42,18 +42,18 @@ init location =
     in
         model
             ! [ eth_task
-              , Web3.netVersion |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault "" |> Msgs.PrintDebug "netVersion")
-              , Web3.netListening |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault False |> toString |> Msgs.PrintDebug "netListening")
-              , Web3.clientVersion |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault "" |> Msgs.PrintDebug "clientVersion")
-              , Web3.ethGasPrice |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> BigInt.toString |> Msgs.PrintDebug "ethGasPrice")
-              , Web3.netPeerCount |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> BigInt.toString |> Msgs.PrintDebug "netPeerCount")
-              , Web3.ethAccounts |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault [] |> toString |> Msgs.PrintDebug "ethAccounts")
+              , Web3.netVersion |> Web3.send web3_config (\res -> res |> Result.withDefault "" |> Msgs.PrintDebug "netVersion")
+              , Web3.netListening |> Web3.send web3_config (\res -> res |> Result.withDefault False |> toString |> Msgs.PrintDebug "netListening")
+              , Web3.clientVersion |> Web3.send web3_config (\res -> res |> Result.withDefault "" |> Msgs.PrintDebug "clientVersion")
+              , Web3.ethGasPrice |> Web3.send web3_config (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> BigInt.toString |> Msgs.PrintDebug "ethGasPrice")
+              , Web3.netPeerCount |> Web3.send web3_config (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> BigInt.toString |> Msgs.PrintDebug "netPeerCount")
+              , Web3.ethAccounts |> Web3.send web3_config (\res -> res |> Result.withDefault [] |> toString |> Msgs.PrintDebug "ethAccounts")
               ]
 
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Web3.subscriptions
+    Web3.subscriptions web3_config
 
 
 main : Program Never Model Msg
@@ -64,3 +64,5 @@ main =
         , update = Update.update
         , subscriptions = subscriptions
         }
+
+web3_config = Web3.config Msg.Web3Msg
