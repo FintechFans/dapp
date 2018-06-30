@@ -68,12 +68,25 @@ update porter_msg model =
 
 request : Web3RPCCall -> (Web3RPCResponse -> Result Error res) -> Request res
 request call_info request_handler =
-    Porter.fancyRequest call_info request_handler
+    Web3.Types.Request (Porter.request call_info) request_handler
 
 
 send : Config msg -> (Result Error res -> msg) -> Request res -> Cmd msg
-send config msg_handler req =
-    Porter.send config msg_handler req
+send config msg_handler (Web3.Types.Request porter_request result_handler) =
+    Porter.send config (result_handler >> msg_handler) porter_request
+
+
+
+-- andThen : (Result Error resA -> Web3.Types.Request resB) -> Web3.Types.Request resA -> Web3.Types.Request resB
+-- andThen fun (Web3.Types.Request porter_req res_handler) =
+--     let
+--         foo res = res |> res_handler |> fun
+--         bar res =
+--             case foo res of
+--                 Web3.Types.Request porter_req2 res_handler2 ->
+--                     Porter.request porter_req2
+--     in
+--         Web3.Types.Request (Porter.andThen (bar) porter_req)
 
 
 decodeJSONRPCResult : Decode.Decoder res -> Web3RPCResponse -> Result Error res
@@ -118,9 +131,6 @@ netVersion =
 netListening : Request Bool
 netListening =
     request { method = "net_listening", params = [] } (decodeJSONRPCResult Decode.bool)
-
-
-
 
 
 netPeerCount : Request Int

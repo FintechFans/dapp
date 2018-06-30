@@ -20,8 +20,7 @@ type Web3RPCResponse
     | ErrorResponse Int String
 
 
-type alias Request res =
-    Porter.RequestWithHandler Web3RPCCall Web3RPCResponse (Result Error res)
+type Request res = Request (Porter.Request Web3RPCCall Web3RPCResponse) (Web3RPCResponse -> Result Error res)
 
 
 type alias Message msg =
