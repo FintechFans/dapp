@@ -1,7 +1,7 @@
 module Web3.Utils exposing (..)
 
 import Result
-import Web3.Types exposing (Error, Address(..))
+import Web3.Types exposing (Error, Address(..), UnformattedData)
 import Hex
 import Char
 import BigInt exposing (BigInt)
@@ -88,7 +88,7 @@ into their hexadecimal format.
     unformattedDataToHexString "foo" == "0x666f6f"
 
 -}
-unformattedDataToHexString : String -> String
+unformattedDataToHexString : UnformattedData -> String
 unformattedDataToHexString input =
     input
         |> String.toList
@@ -133,7 +133,7 @@ Returns Err if:
     hexStringToUnformattedData "0x666f6f" == Ok "foo"
 
 -}
-hexStringToUnformattedData : String -> Result String String
+hexStringToUnformattedData : String -> Result String UnformattedData
 hexStringToUnformattedData input =
     let
         unsafeFun stripped_input =

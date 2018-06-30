@@ -87,3 +87,5 @@ type BlockParameter
     | Pending
 
 type Address = Address String
+type alias UnformattedData = String
+type alias Sha3Hash = String

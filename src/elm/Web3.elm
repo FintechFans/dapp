@@ -4,11 +4,12 @@ import Json.Encode as Encode
 import Json.Decode as Decode
 import Porter
 import Msgs exposing (Msg)
-import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address)
+import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash)
 import Web3.Utils
 import BigInt exposing (BigInt)
 import Result.Extra
 import Json.Decode.Extra as DecodeExtra
+import Web3.Decode
 
 
 port outgoing : Encode.Value -> Cmd msg
@@ -21,16 +22,16 @@ porterConfig : Config Msg
 porterConfig =
     { outgoingPort = outgoing
     , incomingPort = incoming
-    , encodeRequest = web3_call_encode
-    , decodeResponse = web3_call_decode
+    , encodeRequest = web3_call_encoder
+    , decodeResponse = web3_call_decoder
     , porterMsg = Msgs.Web3Msg
     }
 
 
 {-| Encodes a Web3RPCCall object into a JSON-RPC-ready JavaScript object
 -}
-web3_call_encode : Web3RPCCall -> Encode.Value
-web3_call_encode web3_rpc_call =
+web3_call_encoder : Web3RPCCall -> Encode.Value
+web3_call_encoder web3_rpc_call =
     Encode.object
         [ ( "jsonrpc", Encode.string "2.0" )
         , ( "method", Encode.string web3_rpc_call.method )
@@ -40,8 +41,8 @@ web3_call_encode web3_rpc_call =
 
 {-| Decodes a response from a JavaScript-supplied JSON-RPC-response into a Web3RPCResponse value
 -}
-web3_call_decode : Decode.Decoder Web3RPCResponse
-web3_call_decode =
+web3_call_decoder : Decode.Decoder Web3RPCResponse
+web3_call_decoder =
     let
         successful_response_decoder =
             Decode.field "result" Decode.value
@@ -85,10 +86,16 @@ so only do this as a last resort.
 
 Converting parameters to hex-format and converting the responses from hex format to their actual types has to be done manually as well.
 
+Decoding happens as follows:
+
+1.  `web3_call_decoder` transforms the incoming JSON to a `Web3RPCResponse`
+2.  `interpretJSONRPCResult` transforms the `Web3RPCResponse` into a `Result Error Decode.Value`
+3.  The specified `request_decoder` transforms this `Decode.Value` into `res`.
+
 -}
-request : Web3RPCCall -> (Decode.Value -> Result Error res) -> Request res
-request call_info request_handler =
-    Web3.Types.Request (Porter.request call_info) (decodeJSONRPCResult2 >> Result.andThen request_handler)
+request : Web3RPCCall -> Decode.Decoder res -> Request res
+request call_info request_decoder =
+    Web3.Types.Request (Porter.request call_info) (interpretJSONRPCResult >> Result.andThen (Web3.Decode.decodeValue request_decoder))
 
 
 {-| Performs a (chain of) request(s) constructed using this library
@@ -101,157 +108,69 @@ send config msg_handler (Web3.Types.Request porter_request result_handler) =
     Porter.send config (result_handler >> msg_handler) porter_request
 
 
-decodeJSONRPCResult2 : Web3RPCResponse -> Result Error Decode.Value
-decodeJSONRPCResult2 response =
-    case response of
-        SuccessfulResponse val ->
-            Result.Ok val
-        ErrorResponse -32700 str ->
-            Result.Err (Web3.Types.ServerError (Web3.Types.ParseError str))
-        ErrorResponse -32600 str ->
-            Result.Err (Web3.Types.ServerError (Web3.Types.InvalidRequest str))
-        ErrorResponse -32601 str ->
-            Result.Err (Web3.Types.ServerError (Web3.Types.MethodNotFound str))
-        ErrorResponse -32602 str ->
-            Result.Err (Web3.Types.ServerError (Web3.Types.InvalidParams str))
-        ErrorResponse -32603 str ->
-            Result.Err (Web3.Types.ServerError (Web3.Types.InternalError str))
-        ErrorResponse code str ->
-            Result.Err (Web3.Types.ServerError (Web3.Types.UnknownError code str))
- 
-
--- andThen : (Result Error resA -> Web3.Types.Request resB) -> Web3.Types.Request resA -> Web3.Types.Request resB
--- andThen fun (Web3.Types.Request porter_req res_handler) =
---     let
---         foo res = res |> res_handler |> fun
---         bar res =
---             case foo res of
---                 Web3.Types.Request porter_req2 res_handler2 ->
---                     Porter.request porter_req2
---     in
---         Web3.Types.Request (Porter.andThen (bar) porter_req)
-
-
 {-| Internal function that decodes the result of a JSON-RPC call,
 mapping JSON-RPC error codes to their proper Web3.Types.Error instance,
 and passing a successful response to the supplied `decoder`.
-
-TODO Maybe re-write so it can be chained, rather than passing an initial decoder in here as argument?
-
 -}
-decodeJSONRPCResult : Decode.Decoder res -> Web3RPCResponse -> Result Error res
-decodeJSONRPCResult decoder response =
+interpretJSONRPCResult : Web3RPCResponse -> Result Error Decode.Value
+interpretJSONRPCResult response =
     case response of
         SuccessfulResponse val ->
-            val
-                |> Decode.decodeValue decoder
-                |> Result.mapError Web3.Types.ResultParseError
+            Result.Ok val
 
         ErrorResponse -32700 str ->
-            Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerError (Web3.Types.ParseError str))
+            Result.Err (Web3.Types.ServerError (Web3.Types.ParseError str))
 
         ErrorResponse -32600 str ->
-            Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerError (Web3.Types.InvalidRequest str))
+            Result.Err (Web3.Types.ServerError (Web3.Types.InvalidRequest str))
 
         ErrorResponse -32601 str ->
-            Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerError (Web3.Types.MethodNotFound str))
+            Result.Err (Web3.Types.ServerError (Web3.Types.MethodNotFound str))
 
         ErrorResponse -32602 str ->
-            Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerError (Web3.Types.InvalidParams str))
+            Result.Err (Web3.Types.ServerError (Web3.Types.InvalidParams str))
 
         ErrorResponse -32603 str ->
-            Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerError (Web3.Types.InternalError str))
+            Result.Err (Web3.Types.ServerError (Web3.Types.InternalError str))
 
         ErrorResponse code str ->
-            Debug.log "decodeJSONRPCResult error case!" <| Result.Err (Web3.Types.ServerError (Web3.Types.UnknownError code str))
+            Result.Err (Web3.Types.ServerError (Web3.Types.UnknownError code str))
 
-
-runDecoder : Decode.Decoder a -> Decode.Value -> Result Error a
-runDecoder decoder res =
-    res
-        |> Decode.decodeValue decoder
-        |> Result.mapError Web3.Types.ResultParseError
-
-decodeString : Decode.Value -> Result Error String
-decodeString res =
-    runDecoder Decode.string res
-
-
-decodeBool : Decode.Value -> Result Error Bool
-decodeBool res =
-        runDecoder Decode.bool res
-
-
-decodeBigInt : Decode.Value -> Result Error BigInt
-decodeBigInt res =
-    let
-        decoder =
-            Decode.string
-                |> Decode.andThen (Web3.Utils.hexQuantityToBigInt >> DecodeExtra.fromResult)
-    in
-        runDecoder decoder res
-
-decodeUnformattedData : Decode.Value -> Result Error String
-decodeUnformattedData res =
-    let
-        decoder =
-            Decode.string
-                |> Decode.andThen(Web3.Utils.hexStringToUnformattedData >> DecodeExtra.fromResult)
-    in
-        runDecoder decoder res
-
-
-decodeList : Decode.Decoder a -> Decode.Value -> Result Error (List a)
-decodeList decoder res =
-    let
-        ldecoder = Decode.list decoder
-    in
-        runDecoder ldecoder res
-
-decodeAddresses : Decode.Value -> Result Error (List Address)
-decodeAddresses res =
-    let
-        decoder =
-            Decode.string
-                |> Decode.list
-                |> Decode.andThen (List.map Web3.Utils.hexStringToAddress >> Result.Extra.combine >> DecodeExtra.fromResult)
-    in
-        runDecoder decoder res
 
 clientVersion : Request String
 clientVersion =
-    request { method = "web3_clientVersion", params = [] } decodeString
+    request { method = "web3_clientVersion", params = [] } Decode.string
 
 
 netVersion : Request String
 netVersion =
-    request { method = "net_version", params = [] } decodeString
+    request { method = "net_version", params = [] } Decode.string
 
 
 netListening : Request Bool
 netListening =
-    request { method = "net_listening", params = [] } decodeBool
+    request { method = "net_listening", params = [] } Decode.bool
 
 
 netPeerCount : Request BigInt
 netPeerCount =
-    request { method = "net_peerCount", params = [] } decodeBigInt
+    request { method = "net_peerCount", params = [] } Web3.Decode.big_int
 
 
 ethGasPrice : Request BigInt
 ethGasPrice =
-    request { method = "eth_gasPrice", params = [] } decodeBigInt
+    request { method = "eth_gasPrice", params = [] } Web3.Decode.big_int
 
 
-web3Sha3 : String -> Request String
+web3Sha3 : String -> Request Sha3Hash
 web3Sha3 str =
     let
         hexstring =
             str |> Web3.Utils.unformattedDataToHexString
     in
-        request { method = "web3_sha3", params = [ hexstring ] } decodeUnformattedData
+        request { method = "web3_sha3", params = [ hexstring ] } Web3.Decode.unformatted_data
 
 
 ethAccounts : Request (List Address)
 ethAccounts =
-    request { method = "eth_accounts", params = [] } decodeAddresses
+    request { method = "eth_accounts", params = [] } (Decode.list Web3.Decode.address)
