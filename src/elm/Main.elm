@@ -8,6 +8,7 @@ import Update
 import View
 import Web3
 import Web3.Types
+import Result.Extra
 
 
 -- import Porter
@@ -31,7 +32,7 @@ init location =
             Web3.send web3_config (conversion >> Msgs.PrintDebug name)
         eth_blocknum_task =
             Web3.ethBlockNumber
-                |> Web3.send web3_config Msgs.EthBlockNumberKnown
+                |> Web3.send web3_config (Result.Extra.unpack (toString >> Msgs.PrintDebug "Error While fetching ethBlockNumber") Msgs.EthBlockNumberKnown)
     in
         model
             ! [ eth_blocknum_task

@@ -34,11 +34,8 @@ updateLocationChange location model =
             in
                 ( { model | route = newRoute }, Cmd.none )
 
-updateBlockNumber : Result Web3.Types.Error BigInt -> Model -> (Model, Cmd Msg)
-updateBlockNumber res model =
-    case res of
-        Err _ -> (model, Cmd.none)
-        Ok block_number ->
+updateBlockNumber : BigInt -> Model -> (Model, Cmd Msg)
+updateBlockNumber block_number model =
             let
                 old_eth_info = model.ethereum_info
                 ethereum_info = {old_eth_info | block_depth = BigInt.toString block_number}

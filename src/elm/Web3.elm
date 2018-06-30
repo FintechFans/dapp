@@ -105,6 +105,9 @@ send : Config msg -> (Result Error res -> msg) -> Request res -> Cmd msg
 send config msg_handler (Web3.Types.Request porter_request result_handler) =
     Porter.send config (result_handler >> msg_handler) porter_request
 
+{-| TODO no idea if this function is useful? -}
+map : (Result Error resA -> Result Error resB) -> Request resA -> Request resB
+map result_handler (Web3.Types.Request porter_request original_result_handler)  = Web3.Types.Request porter_request (original_result_handler >> result_handler)
 
 {-| Internal function that decodes the result of a JSON-RPC call,
 mapping JSON-RPC error codes to their proper Web3.Types.Error instance,

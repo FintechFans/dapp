@@ -80,7 +80,7 @@ See <https://github.com/ethereum/wiki/wiki/JSON-RPC#the-default-block-parameter>
 
 -}
 type BlockParameter
-    = Hex Int
+    = BlockNumber BigInt
     | Earliest
     | Latest
     | Pending
