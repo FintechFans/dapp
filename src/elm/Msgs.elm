@@ -1,18 +1,13 @@
 module Msgs exposing (..)
 
 import Navigation exposing (Location)
-import Porter
 -- type alias Web3Message = Porter.Msg String String Msg
 import BigInt exposing (BigInt)
 import Web3.Types
 
 type Msg
-    = Foo String
-    | NetVersion String
-    | NetPeerCount BigInt
-    | ClientVersion String
-    | NetListening Bool
-    | NavigateTo String
+    = NavigateTo String
     | LocationChange Location
     | EthBlockNumberKnown Int
-    | Web3Msg (Web3.Types.Message Msg)
+    | Web3Msg (Web3.Types.Message Msg) -- Internal Msg used by Web3
+    | PrintDebug String String

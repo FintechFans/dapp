@@ -187,6 +187,10 @@ netPeerCount : Request BigInt
 netPeerCount =
     request { method = "net_peerCount", params = [] } decodeBigInt
 
+ethGasPrice : Request BigInt
+ethGasPrice =
+    request { method = "eth_gasPrice", params = [] } decodeBigInt
+
 
 web3Sha3 : String -> Request String
 web3Sha3 str =
