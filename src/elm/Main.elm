@@ -11,6 +11,7 @@ import Task
 import Web3
 -- import Porter
 import Debug
+import BigInt
 
 
 init : Navigation.Location -> (Model, Cmd Msg)
@@ -36,7 +37,7 @@ init location =
             , Web3.netVersion |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault "" |> Debug.log "netVersion" |> Msgs.NetVersion)
             , Web3.netListening |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault False |> Debug.log "netListening" |> Msgs.NetListening)
             , Web3.clientVersion |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault "" |> Debug.log "clientVersion" |> Msgs.ClientVersion)
-            , Web3.netPeerCount |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault 0 |> Debug.log "netPeerCount" |> Msgs.NetPeerCount)
+            , Web3.netPeerCount |> Web3.send Web3.porterConfig (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> Debug.log "netPeerCount" |> Msgs.NetPeerCount)
             ]
 
 do_something res =

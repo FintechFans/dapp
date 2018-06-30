@@ -6,6 +6,7 @@ import Porter
 import Msgs exposing (Msg)
 import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error)
 import Web3.Utils
+import BigInt exposing (BigInt)
 
 
 port outgoing : Encode.Value -> Cmd msg
@@ -133,12 +134,12 @@ netListening =
     request { method = "net_listening", params = [] } (decodeJSONRPCResult Decode.bool)
 
 
-netPeerCount : Request Int
+netPeerCount : Request BigInt
 netPeerCount =
     let
         responseHandler res =
             res
                 |> decodeJSONRPCResult Decode.string
-                |> Result.andThen Web3.Utils.hexQuantityToInt
+                |> Result.andThen Web3.Utils.hexQuantityToBigInt
     in
         request { method = "net_peerCount", params = [] } responseHandler
