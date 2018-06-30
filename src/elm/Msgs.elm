@@ -8,6 +8,6 @@ import Web3.Types
 type Msg
     = NavigateTo String
     | LocationChange Location
-    | EthBlockNumberKnown Int
+    | EthBlockNumberKnown (Result Web3.Types.Error BigInt)
     | Web3Msg (Web3.Types.Message Msg) -- Internal Msg used by Web3
     | PrintDebug String String

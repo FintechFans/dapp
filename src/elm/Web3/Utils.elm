@@ -154,21 +154,23 @@ hexStringToUnformattedData input =
 Returns Err if:
 
   - Not hexadecimal
-  - Not 20 bytes long.
+  - More than 20 bytes long.
+
+(If the input address is shorter than 20 bytes, NUL-character bytes are added to the left to make the address 20 bytes. This is required to parse addresses like `"0x"`, `"0x0"`, `"0x10"` etc correctly)
 
 -}
 hexStringToAddress : String -> Result String Address
 hexStringToAddress input =
     let
         isAddress str =
-            String.length str == 20
+            String.length str <= 20
     in
         input
             |> hexStringToUnformattedData
             |> Result.andThen
                 (\x ->
                     if isAddress x then
-                        Ok (Address input)
+                        Ok (Address (String.padLeft 20 '\0' x))
                     else
                         Err ("Passed hexadecimal string was not an address (not 20 bytes long)")
                 )

@@ -3,6 +3,7 @@ module Web3.Types exposing (..)
 import Porter
 import Json.Decode as Decode
 import Json.Encode as Encode
+import BigInt exposing (BigInt)
 
 
 type alias Model msg_type =
@@ -20,7 +21,8 @@ type Web3RPCResponse
     | ErrorResponse Int String
 
 
-type Request res = Request (Porter.Request Web3RPCCall Web3RPCResponse) (Web3RPCResponse -> Result Error res)
+type Request res
+    = Request (Porter.Request Web3RPCCall Web3RPCResponse) (Web3RPCResponse -> Result Error res)
 
 
 type alias Message msg =
@@ -32,17 +34,20 @@ type alias Config msg =
 
 
 {-| Errors we might encounter when performing calls:
- - Server (or network)-related errors,
- - Errors related to the parsing of RPC responses.
- -}
+
+  - Server (or network)-related errors,
+  - Errors related to the parsing of RPC responses.
+
+-}
 type Error
     = ServerError JSONRPCError
     | ResultParseError String
 
+
 {-| The various types of errors that a JSON-RPC server might return with.
- This library maps the standardized error codes to these readable instances;
- non-standard error codes are mapped to 'UnknownError' which will contain the code in there.
- -}
+This library maps the standardized error codes to these readable instances;
+non-standard error codes are mapped to 'UnknownError' which will contain the code in there.
+-}
 type JSONRPCError
     = UnknownError Int String
     | ParseError String
@@ -55,12 +60,6 @@ type JSONRPCError
 init : Model msg
 init =
     Porter.init
-
-
-{-| TODO Fill in known networks here
--}
-type alias NetworkVersion =
-    Int
 
 
 {-| A type representing the kind of software your client is running
@@ -86,6 +85,36 @@ type BlockParameter
     | Latest
     | Pending
 
-type Address = Address String
-type alias UnformattedData = String
-type alias Sha3Hash = String
+
+
+-- TODO Hide constructor
+
+
+type Address
+    = Address String
+
+
+type alias UnformattedData =
+    String
+
+
+type alias Sha3Hash =
+    String
+
+
+type NetworkVersion
+    = Mainnet
+    | Testnet TestnetVersion
+    | UnknownNetwork String
+
+
+type TestnetVersion
+    = Morden
+    | Ropsten
+    | Rinkeby
+    | Kovan
+
+
+type Syncing
+    = NotSyncing
+    | Syncing { startingBlock : BigInt, currentBlock : BigInt, highestBlock : BigInt }

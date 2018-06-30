@@ -4,8 +4,7 @@ import Json.Encode as Encode
 import Json.Decode as Decode
 import Porter
 import BigInt exposing (BigInt)
-import Msgs exposing (Msg)
-import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash)
+import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash, NetworkVersion, Syncing)
 import Web3.Utils
 import Web3.Decode
 
@@ -16,8 +15,8 @@ port outgoing : Encode.Value -> Cmd msg
 port incoming : (Decode.Value -> msg) -> Sub msg
 
 
-porterConfig : (Web3.Types.Message msg -> msg) -> Config msg
-porterConfig web3_msg =
+config : (Web3.Types.Message msg -> msg) -> Config msg
+config web3_msg =
     { outgoingPort = outgoing
     , incomingPort = incoming
     , encodeRequest = web3_call_encoder
@@ -67,7 +66,7 @@ subscriptions config =
 
 {-| Should be added to your application so Web3 is able to chain requests/responses made using its library.
 -}
-update : Config msg -> msg -> {web3_porter : Porter.Model} -> (a, Cmd msg)
+update : Config msg -> Web3.Types.Message msg -> {a | web3_porter : Web3.Types.Model msg} -> ({a | web3_porter : Web3.Types.Model msg}, Cmd msg)
 update config incoming_msg model =
     let
         ( porter_model, porter_cmd ) =
@@ -141,9 +140,13 @@ clientVersion =
     request { method = "web3_clientVersion", params = [] } Decode.string
 
 
-netVersion : Request String
+ethProtocolVersion : Request String
+ethProtocolVersion =
+    request { method = "eth_protocolVersion", params = [] } Decode.string
+
+netVersion : Request NetworkVersion
 netVersion =
-    request { method = "net_version", params = [] } Decode.string
+    request { method = "net_version", params = [] } Web3.Decode.network_version
 
 
 netListening : Request Bool
@@ -173,3 +176,26 @@ web3Sha3 str =
 ethAccounts : Request (List Address)
 ethAccounts =
     request { method = "eth_accounts", params = [] } (Decode.list Web3.Decode.address)
+
+
+ethBlockNumber : Request BigInt
+ethBlockNumber =
+    request { method = "eth_blockNumber", params = [] } Web3.Decode.big_int
+
+ethSyncing : Request Syncing
+ethSyncing =
+    request { method = "eth_syncing", params = [] } Web3.Decode.syncing
+
+
+ethCoinbase : Request Address
+ethCoinbase =
+    request { method = "eth_coinbase", params = [] } Web3.Decode.address
+
+
+ethMining : Request Bool
+ethMining =
+    request { method = "eth_mining", params = [] } Decode.bool
+
+ethHashrate : Request BigInt
+ethHashrate =
+    request { method = "eth_hashrate", params = [] } Web3.Decode.big_int

@@ -6,6 +6,7 @@ import Routing
 import Navigation
 import Web3
 import Web3.Types
+import BigInt exposing (BigInt)
 
 update : Web3.Types.Config Msg -> Msg -> Model -> ( Model, Cmd Msg )
 update web3_config msg model =
@@ -33,10 +34,13 @@ updateLocationChange location model =
             in
                 ( { model | route = newRoute }, Cmd.none )
 
-updateBlockNumber : Int -> Model -> (Model, Cmd Msg)
-updateBlockNumber block_number model =
+updateBlockNumber : Result Web3.Types.Error BigInt -> Model -> (Model, Cmd Msg)
+updateBlockNumber res model =
+    case res of
+        Err _ -> (model, Cmd.none)
+        Ok block_number ->
             let
                 old_eth_info = model.ethereum_info
-                ethereum_info = {old_eth_info | block_depth = toString block_number}
+                ethereum_info = {old_eth_info | block_depth = BigInt.toString block_number}
             in
                 {model | ethereum_info = ethereum_info} ! []
