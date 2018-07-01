@@ -3,6 +3,7 @@ port module Web3 exposing (..)
 import Json.Encode as Encode
 import Json.Decode as Decode
 import Porter
+import Porter.Multi
 import BigInt exposing (BigInt)
 import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash, NetworkVersion, Syncing)
 import Web3.Utils
@@ -21,7 +22,7 @@ config web3_msg =
     , incomingPort = incoming
     , encodeRequest = web3_call_encoder
     , decodeResponse = web3_call_decoder
-    , porterMsg = web3_msg
+    , porterMultiMsg = web3_msg
     }
 
 
@@ -61,7 +62,7 @@ web3_call_decoder =
 -}
 subscriptions : Config msg -> Sub msg
 subscriptions config =
-    Porter.subscriptions config
+    Porter.Multi.subscriptions config
 
 
 {-| Should be added to your application so Web3 is able to chain requests/responses made using its library.
@@ -70,7 +71,7 @@ update : Config msg -> Web3.Types.Message msg -> {a | web3_porter : Web3.Types.M
 update config incoming_msg model =
     let
         ( porter_model, porter_cmd ) =
-            Porter.update config incoming_msg model.web3_porter
+            Porter.Multi.update config incoming_msg model.web3_porter
     in
         -- Debug.log (toString porter_msg)
         ( { model | web3_porter = porter_model }, porter_cmd )
@@ -93,7 +94,8 @@ Decoding happens as follows:
 -}
 request : Web3RPCCall -> Decode.Decoder res -> Request res
 request call_info request_decoder =
-    Web3.Types.Request (Porter.request call_info) (interpretJSONRPCResult >> Result.andThen (Web3.Decode.decodeValue request_decoder))
+    -- Web3.Types.Request (Porter.request call_info) (interpretJSONRPCResult >> Result.andThen (Web3.Decode.decodeValue request_decoder))
+    Porter.Multi.request call_info (interpretJSONRPCResult >> Result.andThen (Web3.Decode.decodeValue request_decoder))
 
 
 {-| Performs a (chain of) request(s) constructed using this library
@@ -102,12 +104,14 @@ The given `msgHandler` will be called with the resulting answer.
 
 -}
 send : Config msg -> (Result Error res -> msg) -> Request res -> Cmd msg
-send config msg_handler (Web3.Types.Request porter_request result_handler) =
-    Porter.send config (result_handler >> msg_handler) porter_request
+send config msg_handler request =
+    Porter.Multi.send config msg_handler request
+-- send config msg_handler (Web3.Types.Request porter_request result_handler) =
+--     Porter.send config (result_handler >> msg_handler) porter_request
 
-{-| TODO no idea if this function is useful? -}
-map : (Result Error resA -> Result Error resB) -> Request resA -> Request resB
-map result_handler (Web3.Types.Request porter_request original_result_handler)  = Web3.Types.Request porter_request (original_result_handler >> result_handler)
+-- {-| TODO no idea if this function is useful? -}
+-- map : (Result Error resA -> Result Error resB) -> Request resA -> Request resB
+-- map result_handler (Web3.Types.Request porter_request original_result_handler)  = Web3.Types.Request porter_request (original_result_handler >> result_handler)
 
 {-| Internal function that decodes the result of a JSON-RPC call,
 mapping JSON-RPC error codes to their proper Web3.Types.Error instance,

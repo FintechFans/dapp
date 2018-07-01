@@ -1,13 +1,14 @@
 module Web3.Types exposing (..)
 
 import Porter
+import Porter.Multi
 import Json.Decode as Decode
 import Json.Encode as Encode
 import BigInt exposing (BigInt)
 
 
 type alias Model msg_type =
-    Porter.Model Web3RPCCall Web3RPCResponse msg_type
+    Porter.Multi.Model Web3RPCCall Web3RPCResponse msg_type
 
 
 type alias Web3RPCCall =
@@ -21,16 +22,17 @@ type Web3RPCResponse
     | ErrorResponse Int String
 
 
-type Request res
-    = Request (Porter.Request Web3RPCCall Web3RPCResponse) (Web3RPCResponse -> Result Error res)
+type alias Request res
+    = Porter.Multi.Request Web3RPCCall Web3RPCResponse (Result Error res)
+    -- = Request (Porter.Request Web3RPCCall Web3RPCResponse) (Web3RPCResponse -> Result Error res)
 
 
 type alias Message msg =
-    Porter.Msg Web3RPCCall Web3RPCResponse msg
+    Porter.Multi.Msg Web3RPCCall Web3RPCResponse msg
 
 
 type alias Config msg =
-    Porter.Config Web3RPCCall Web3RPCResponse msg
+    Porter.Multi.Config Web3RPCCall Web3RPCResponse msg
 
 
 {-| Errors we might encounter when performing calls:
@@ -59,7 +61,7 @@ type JSONRPCError
 
 init : Model msg
 init =
-    Porter.init
+    Porter.Multi.init
 
 
 {-| A type representing the kind of software your client is running
