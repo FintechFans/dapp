@@ -37,7 +37,7 @@ init location =
         complex_task =
             Web3.ethBlockNumber
                 |> Web3.andThen (\res -> res |> Result.withDefault (BigInt.fromInt 0) |> (\res -> Web3.ethGetBlockByNumber res True))
-                |> debug_send toString "complex_task; Sha3 of latest block number"
+                |> debug_send toString "complex_task; Fetching information of latest block."
     in
         model
             ! [ eth_blocknum_task
