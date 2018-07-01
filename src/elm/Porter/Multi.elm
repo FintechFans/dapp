@@ -1,6 +1,8 @@
 module Porter.Multi exposing (..)
 
 import Porter
+import Json.Encode as Encode
+import Json.Decode as Decode
 
 
 type Request req res a
@@ -9,10 +11,21 @@ type Request req res a
 
 
 type alias Config req res msg a =
-    { porter_config : Porter.Config req res msg
-    , porter_multi_msg : Msg req res msg a -> msg
+    { outgoingPort : Encode.Value -> Cmd msg
+    , incomingPort : (Encode.Value -> Porter.Msg req res msg) -> Sub (Porter.Msg req res msg)
+    , encodeRequest : req -> Encode.Value
+    , decodeResponse : Decode.Decoder res
+    , porterMultiMsg : Msg req res msg a -> msg
     }
 
+configToPorterConfig : Config req res msg a -> Porter.Config req res msg
+configToPorterConfig config =
+    { porterMsg = (\msg -> (config.porterMultiMsg (PorterMsg msg)))
+    , outgoingPort = config.outgoingPort
+    , incomingPort = config.incomingPort
+    , encodeRequest = config.encodeRequest
+    , decodeResponse = config.decodeResponse
+    }
 
 type Msg req res msg a
     = PorterMsg (Porter.Msg req res msg)
@@ -65,10 +78,10 @@ send : Config req res msg a -> (a -> msg) -> Request req res a -> Cmd msg
 send config msg_handler request =
     case request of
         SimpleRequest porter_req response_handler ->
-            Porter.send (config.porter_config) (response_handler >> msg_handler) porter_req
+            Porter.send (configToPorterConfig config) (response_handler >> msg_handler) porter_req
 
         ComplexRequest porter_req next_request_fun ->
-            Porter.send (config.porter_config) (\res -> config.porter_multi_msg (ResolveChain msg_handler (next_request_fun res))) porter_req
+            Porter.send (configToPorterConfig config) (\res -> config.porterMultiMsg (ResolveChain msg_handler (next_request_fun res))) porter_req
 
 
 update : Config req res msg a -> Msg req res msg a -> Model req res msg -> ( Model req res msg, Cmd msg )
@@ -77,7 +90,7 @@ update config msg model =
         PorterMsg porter_msg ->
             let
                 ( porter_model, porter_cmd ) =
-                    Porter.update config.porter_config porter_msg model.porter_model
+                    Porter.update (configToPorterConfig config) porter_msg model.porter_model
             in
                 ( { model | porter_model = porter_model }, porter_cmd )
 
@@ -86,4 +99,4 @@ update config msg model =
 
 subscriptions : Config req res msg a -> Sub msg
 subscriptions config =
-    Porter.subscriptions config.porter_config
+    Porter.subscriptions (configToPorterConfig config)
