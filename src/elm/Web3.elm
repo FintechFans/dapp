@@ -33,7 +33,7 @@ web3_call_encoder web3_rpc_call =
     Encode.object
         [ ( "jsonrpc", Encode.string "2.0" )
         , ( "method", Encode.string web3_rpc_call.method )
-        , ( "params", web3_rpc_call.params |> List.map Encode.string |> Encode.list )
+        , ( "params", web3_rpc_call.params |> Encode.list )
         ]
 
 
@@ -113,6 +113,11 @@ send config msg_handler request =
 -- map : (Result Error resA -> Result Error resB) -> Request resA -> Request resB
 -- map result_handler (Web3.Types.Request porter_request original_result_handler)  = Web3.Types.Request porter_request (original_result_handler >> result_handler)
 
+andThen : (Result Error a -> Request b) -> Request a -> Request b
+andThen fun res_a =
+    res_a
+        |> Porter.Multi.andThen fun
+
 {-| Internal function that decodes the result of a JSON-RPC call,
 mapping JSON-RPC error codes to their proper Web3.Types.Error instance,
 and passing a successful response to the supplied `decoder`.
@@ -175,7 +180,7 @@ web3Sha3 : String -> Request Sha3Hash
 web3Sha3 str =
     let
         hexstring =
-            str |> Web3.Utils.unformattedDataToHexString
+            str |> Web3.Utils.unformattedDataToHexString |> Encode.string
     in
         request { method = "web3_sha3", params = [ hexstring ] } Web3.Decode.unformatted_data
 
@@ -206,3 +211,12 @@ ethMining =
 ethHashrate : Request BigInt
 ethHashrate =
     request { method = "eth_hashrate", params = [] } Web3.Decode.big_int
+
+
+ethGetBlockByNumber : BigInt -> Bool -> Request Decode.Value
+ethGetBlockByNumber block_number return_full_transaction_info =
+    let
+        num = block_number |> Web3.Utils.bigIntToHexQuantity |> Encode.string
+        bool = Encode.bool return_full_transaction_info
+    in
+        request { method = "eth_getBlockByNumber", params = [num, bool]} Decode.value

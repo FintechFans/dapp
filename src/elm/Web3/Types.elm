@@ -13,7 +13,7 @@ type alias Model msg_type =
 
 type alias Web3RPCCall =
     { method : String
-    , params : List String
+    , params : List Encode.Value
     }
 
 
