@@ -10,15 +10,16 @@ type Request req res a
     | ComplexRequest (Porter.Request req res) (res -> Request req res a)
 
 
-type alias Config req res msg a =
+type alias Config req res msg =
     { outgoingPort : Encode.Value -> Cmd msg
     , incomingPort : (Encode.Value -> Porter.Msg req res msg) -> Sub (Porter.Msg req res msg)
     , encodeRequest : req -> Encode.Value
     , decodeResponse : Decode.Decoder res
-    , porterMultiMsg : Msg req res msg a -> msg
+    , porterMultiMsg : Msg req res msg -> msg
     }
 
-configToPorterConfig : Config req res msg a -> Porter.Config req res msg
+
+configToPorterConfig : Config req res msg -> Porter.Config req res msg
 configToPorterConfig config =
     { porterMsg = (\msg -> (config.porterMultiMsg (PorterMsg msg)))
     , outgoingPort = config.outgoingPort
@@ -27,9 +28,10 @@ configToPorterConfig config =
     , decodeResponse = config.decodeResponse
     }
 
-type Msg req res msg a
+
+type Msg req res msg
     = PorterMsg (Porter.Msg req res msg)
-    | ResolveChain (a -> msg) (Request req res a)
+    | ResolveChain (Request req res msg)
 
 
 type alias Model req res msg =
@@ -55,13 +57,16 @@ andThen reqfun req =
         ComplexRequest porter_req next_request_fun ->
             ComplexRequest porter_req (\res -> andThen reqfun (next_request_fun res))
 
+
 map : (a -> b) -> Request req res a -> Request req res b
 map mapfun req =
     case req of
         SimpleRequest porter_req request_mapper ->
             SimpleRequest porter_req (request_mapper >> mapfun)
+
         ComplexRequest porter_req next_request_fun ->
             ComplexRequest porter_req (\res -> map mapfun (next_request_fun res))
+
 
 map2 : (a -> b -> c) -> Request req res a -> Request req res b -> Request req res c
 map2 mapfun req_a req_b =
@@ -74,17 +79,25 @@ map3 mapfun req_a req_b req_c =
     req_a
         |> andThen (\res_a -> map2 (mapfun res_a) req_b req_c)
 
-send : Config req res msg a -> (a -> msg) -> Request req res a -> Cmd msg
+
+send : Config req res msg -> (a -> msg) -> Request req res a -> Cmd msg
 send config msg_handler request =
-    case request of
-        SimpleRequest porter_req response_handler ->
-            Porter.send (configToPorterConfig config) (response_handler >> msg_handler) porter_req
+    let
+        mapped_request = request |> map msg_handler
+    in
+        case mapped_request of
+            SimpleRequest porter_req response_handler ->
+                Porter.send (configToPorterConfig config) response_handler porter_req
 
-        ComplexRequest porter_req next_request_fun ->
-            Porter.send (configToPorterConfig config) (\res -> config.porterMultiMsg (ResolveChain msg_handler (next_request_fun res))) porter_req
+            ComplexRequest porter_req next_request_fun ->
+                let
+                    resfun res =
+                        config.porterMultiMsg (ResolveChain (next_request_fun res))
+                in
+                    Porter.send (configToPorterConfig config) resfun porter_req
 
 
-update : Config req res msg a -> Msg req res msg a -> Model req res msg -> ( Model req res msg, Cmd msg )
+update : Config req res msg -> Msg req res msg -> Model req res msg -> ( Model req res msg, Cmd msg )
 update config msg model =
     case msg of
         PorterMsg porter_msg ->
@@ -94,9 +107,10 @@ update config msg model =
             in
                 ( { model | porter_model = porter_model }, porter_cmd )
 
-        ResolveChain msg_handler request ->
-            ( model, send config msg_handler request )
+        ResolveChain request ->
+            ( model, send config identity request )
 
-subscriptions : Config req res msg a -> Sub msg
+
+subscriptions : Config req res msg -> Sub msg
 subscriptions config =
     Porter.subscriptions (configToPorterConfig config)
