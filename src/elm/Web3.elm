@@ -174,7 +174,9 @@ ethGasPrice : Request BigInt
 ethGasPrice =
     request { method = "eth_gasPrice", params = [] } Web3.Decode.big_int
 
+{-| NOTE This is currently broken in MetaMask(!)
 
+ -}
 web3Sha3 : String -> Request Sha3Hash
 web3Sha3 str =
     let

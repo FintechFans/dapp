@@ -119,3 +119,25 @@ type TestnetVersion
 type Syncing
     = NotSyncing
     | Syncing { startingBlock : BigInt, currentBlock : BigInt, highestBlock : BigInt }
+
+type alias BlockInfo =
+    { number : Maybe BigInt
+    , hash : Maybe Sha3Hash
+    , parentHash : Sha3Hash
+    , nonce : Maybe String
+    , sha3Uncles : Sha3Hash
+    , logsBloom : String
+    , transactionsRoot : String
+    , stateRoot : String
+    , receiptsRoot : String
+    , miner : Address
+    , difficulty : BigInt
+    , totalDifficulty : BigInt
+    , extraData : String
+    , size : BigInt
+    , gasLimit : BigInt
+    , gasUsed : BigInt
+    , timestamp : BigInt
+    , transactions : List (Decode.Value)
+    , uncles : List (Decode.Value)
+    }

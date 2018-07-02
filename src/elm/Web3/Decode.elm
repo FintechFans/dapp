@@ -64,3 +64,6 @@ syncing =
                 (Decode.field "highestBlock" big_int)
     in
         Decode.oneOf [false_decoder, syncing_obj_decoder]
+
+block_info : Decode.Decode BlockInfo
+block_info = 
