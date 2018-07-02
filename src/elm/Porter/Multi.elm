@@ -1,11 +1,6 @@
 module Porter.Multi
     exposing
         ( Request
-        , Config
-        , configToPorterConfig
-        , Msg
-        , Model
-        , init
         , request
         , andThen
         , andThenResult
@@ -13,8 +8,6 @@ module Porter.Multi
         , map2
         , map3
         , send
-        , update
-        , subscriptions
         )
 
 {-| Port message manager to emulate request-response style communication through ports, where responses can each have their own specialized type.
@@ -44,7 +37,8 @@ Wraps the `Porter` package to do the actual port-communication, but builds a lay
 
  -}
 
-import Porter
+import Porter exposing (Model, Config)
+import Porter.Types exposing (MultiRequest(..), Msg(..))
 import Json.Encode as Encode
 import Json.Decode as Decode
 import Result.Extra
@@ -58,69 +52,68 @@ import Task
   - Short-circuit; just pass on the value `a` without doing any more requests.
 
 -}
-type Request req res a
-    = SimpleRequest (Porter.Request req res) (res -> a)
-    | ComplexRequest (Porter.Request req res) (res -> Request req res a)
-    | ShortCircuit a
+type alias Request req res a = Porter.Types.MultiRequest req res a
+-- type Request req res a
+    -- = SimpleRequest (Porter.Request req res) (res -> a)
+    -- | ComplexRequest (Porter.Request req res) (res -> Request req res a)
+    -- | ShortCircuit a
 
 
-{-| To configure Porter.Multi, you'll need:
+-- | To configure Porter.Multi, you'll need:
 
-1.  An outgoingPort of the correct type
-2.  An incoming port of the correct type
-3.  A way to encode the request type into JSON
-4.  A way to decode the response JSON into an intermediate common 'res' type.
-5.  A `msg` that will be used to perform the internal chaining of requests.
+-- 1.  An outgoingPort of the correct type
+-- 2.  An incoming port of the correct type
+-- 3.  A way to encode the request type into JSON
+-- 4.  A way to decode the response JSON into an intermediate common 'res' type.
+-- 5.  A `msg` that will be used to perform the internal chaining of requests.
 
--}
-type alias Config req res msg =
-    { outgoingPort : Encode.Value -> Cmd msg
-    , incomingPort : (Encode.Value -> Porter.Msg req res msg) -> Sub (Porter.Msg req res msg)
-    , encodeRequest : req -> Encode.Value
-    , decodeResponse : Decode.Decoder res
-    , porterMultiMsg : Msg req res msg -> msg
-    }
-
-
-{-| Allows us to perform low-level Porter calls using the Porter.Multi configuration
-
-Unless you know what you are doing, you probably don't need this ;-)
-
--}
-configToPorterConfig : Config req res msg -> Porter.Config req res msg
-configToPorterConfig config =
-    { porterMsg = (\msg -> (config.porterMultiMsg (PorterMsg msg)))
-    , outgoingPort = config.outgoingPort
-    , incomingPort = config.incomingPort
-    , encodeRequest = config.encodeRequest
-    , decodeResponse = config.decodeResponse
-    }
+-- type alias Config req res msg =
+--     { outgoingPort : Encode.Value -> Cmd msg
+--     , incomingPort : (Encode.Value -> Porter.Msg req res msg) -> Sub (Porter.Msg req res msg)
+--     , encodeRequest : req -> Encode.Value
+--     , decodeResponse : Decode.Decoder res
+--     , porterMultiMsg : Msg req res msg -> msg
+--     }
 
 
-{-| The internal message type. Eiher:
+-- {-| Allows us to perform low-level Porter calls using the Porter.Multi configuration
 
-  - A low level Porter message
-  - One step in a multi-step request chain.
+-- Unless you know what you are doing, you probably don't need this ;-)
 
--}
-type Msg req res msg
-    = PorterMsg (Porter.Msg req res msg)
-    | ResolveChain (Request req res msg)
-
-
-{-| The Porter.Multi Model is used to keep track of state
-across one or multiple port request<->response steps.
--}
-type alias Model req res msg =
-    { porter_model : Porter.Model req res msg }
+-- -}
+-- configToPorterConfig : Config req res msg -> Porter.Config req res msg
+-- configToPorterConfig config =
+--     { porterMsg = (\msg -> (config.porterMultiMsg (PorterMsg msg)))
+--     , outgoingPort = config.outgoingPort
+--     , incomingPort = config.incomingPort
+--     , encodeRequest = config.encodeRequest
+--     , decodeResponse = config.decodeResponse
+--     }
 
 
-{-| Initializes a new Porter.Multi model.
-Should probably be called as part of your program's `init` call.
--}
-init : Model req res msg
-init =
-    { porter_model = Porter.init }
+-- | The internal message type. Eiher:
+
+--   - A low level Porter message
+--   - One step in a multi-step request chain.
+
+-- type alias Msg req res msg = Porter.Msg req res msg
+-- type Msg req res msg
+--     = PorterMsg (Porter.Msg req res msg)
+--     | ResolveChain (Request req res msg)
+
+
+-- | The Porter.Multi Model is used to keep track of state
+-- across one or multiple port request<->response steps.
+-- type alias Model req res msg = Porter.Model req res msg
+-- type alias Model req res msg =
+--     { porter_model : Porter.Model req res msg }
+
+
+-- | Initializes a new Porter.Multi model.
+-- Should probably be called as part of your program's `init` call.
+-- init : Model req res msg
+-- init =
+--     { porter_model = Porter.init }
 
 
 {-| Creates a new Porter.Multi request, specifying:
@@ -211,49 +204,5 @@ This `msg` will be called with the final resulting `a` once the final response h
 -}
 send : Config req res msg -> (a -> msg) -> Request req res a -> Cmd msg
 send config msg_handler request =
-    let
-        mapped_request =
-            request |> map msg_handler
-    in
-        case mapped_request of
-            SimpleRequest porter_req response_handler ->
-                Porter.send (configToPorterConfig config) response_handler porter_req
+    Porter.Types.internal_multi_send config msg_handler request
 
-            ComplexRequest porter_req next_request_fun ->
-                let
-                    resfun res =
-                        config.porterMultiMsg (ResolveChain (next_request_fun res))
-                in
-                    Porter.send (configToPorterConfig config) resfun porter_req
-
-            ShortCircuit val ->
-                val
-                    |> Task.succeed
-                    |> Task.perform identity
-
-
-{-| Should be called by your app once the `msg` specified in `Config.porterMultiMsg` is received in your application;
-
-it performs the internal plumbing of Porter.Multi, returning a new `Porter.Model` that you should update your app's model with.
-
--}
-update : Config req res msg -> Msg req res msg -> Model req res msg -> ( Model req res msg, Cmd msg )
-update config msg model =
-    case msg of
-        PorterMsg porter_msg ->
-            let
-                ( porter_model, porter_cmd ) =
-                    Porter.update (configToPorterConfig config) porter_msg model.porter_model
-            in
-                ( { model | porter_model = porter_model }, porter_cmd )
-
-        ResolveChain request ->
-            ( model, send config identity request )
-
-
-{-| Should be called at the start of your application (or whenever you use Porter.Multi),
-since it is required to receive any responses from JS-land.
--}
-subscriptions : Config req res msg -> Sub msg
-subscriptions config =
-    Porter.subscriptions (configToPorterConfig config)
