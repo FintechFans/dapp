@@ -67,7 +67,7 @@ subscriptions config =
 
 {-| Should be added to your application so Web3 is able to chain requests/responses made using its library.
 -}
-update : Config msg -> Web3.Types.Message msg -> {a | web3_porter : Web3.Types.Model msg} -> ({a | web3_porter : Web3.Types.Model msg}, Cmd msg)
+update : Config msg -> Web3.Types.Message msg -> { a | web3_porter : Web3.Types.Model msg } -> ( { a | web3_porter : Web3.Types.Model msg }, Cmd msg )
 update config incoming_msg model =
     let
         ( porter_model, porter_cmd ) =
@@ -106,17 +106,21 @@ The given `msgHandler` will be called with the resulting answer.
 send : Config msg -> (Result Error res -> msg) -> Request res -> Cmd msg
 send config msg_handler request =
     Porter.Multi.send config msg_handler request
+
+
+
 -- send config msg_handler (Web3.Types.Request porter_request result_handler) =
 --     Porter.send config (result_handler >> msg_handler) porter_request
-
 -- {-| TODO no idea if this function is useful? -}
 -- map : (Result Error resA -> Result Error resB) -> Request resA -> Request resB
 -- map result_handler (Web3.Types.Request porter_request original_result_handler)  = Web3.Types.Request porter_request (original_result_handler >> result_handler)
+
 
 andThen : (a -> Request b) -> Request a -> Request b
 andThen fun res_a =
     res_a
         |> Porter.Multi.andThenResult fun
+
 
 {-| Internal function that decodes the result of a JSON-RPC call,
 mapping JSON-RPC error codes to their proper Web3.Types.Error instance,
@@ -156,6 +160,7 @@ ethProtocolVersion : Request String
 ethProtocolVersion =
     request { method = "eth_protocolVersion", params = [] } Decode.string
 
+
 netVersion : Request NetworkVersion
 netVersion =
     request { method = "net_version", params = [] } Web3.Decode.network_version
@@ -175,9 +180,9 @@ ethGasPrice : Request BigInt
 ethGasPrice =
     request { method = "eth_gasPrice", params = [] } Web3.Decode.big_int
 
-{-| NOTE This is currently broken in MetaMask(!)
 
- -}
+{-| NOTE This is currently broken in MetaMask(!)
+-}
 web3Sha3 : String -> Request Sha3Hash
 web3Sha3 str =
     let
@@ -196,6 +201,7 @@ ethBlockNumber : Request BigInt
 ethBlockNumber =
     request { method = "eth_blockNumber", params = [] } Web3.Decode.big_int
 
+
 ethSyncing : Request Syncing
 ethSyncing =
     request { method = "eth_syncing", params = [] } Web3.Decode.syncing
@@ -210,6 +216,7 @@ ethMining : Request Bool
 ethMining =
     request { method = "eth_mining", params = [] } Decode.bool
 
+
 ethHashrate : Request BigInt
 ethHashrate =
     request { method = "eth_hashrate", params = [] } Web3.Decode.big_int
@@ -218,7 +225,10 @@ ethHashrate =
 ethGetBlockByNumber : BigInt -> Bool -> Request BlockInfo
 ethGetBlockByNumber block_number return_full_transaction_info =
     let
-        num = block_number |> Web3.Utils.bigIntToHexQuantity |> Encode.string
-        bool = Encode.bool return_full_transaction_info
+        num =
+            block_number |> Web3.Utils.bigIntToHexQuantity |> Encode.string
+
+        bool =
+            Encode.bool return_full_transaction_info
     in
-        request { method = "eth_getBlockByNumber", params = [num, bool]} Web3.Decode.block_info
+        request { method = "eth_getBlockByNumber", params = [ num, bool ] } Web3.Decode.block_info

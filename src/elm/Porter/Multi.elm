@@ -10,39 +10,36 @@ module Porter.Multi
         , send
         )
 
-{-| Port message manager to emulate request-response style communication through ports, where responses can each have their own specialized type.
+{-|
 
-Wraps the `Porter` package to do the actual port-communication, but builds a layer to perform conversions to specialized types and chaining of these specialized requests on top.
+With `Porter.Multi` you can create requests that have specialized return values.
+Use this if the normal response types are not good enough for you.
 
-# Configuration
+The setup is exactly the same as when using Porter normally; and just use the `request` and `send` commands that this module provides instead to create requests with specialized return types.
 
-@docs Config
+Mapping over responses and chaining requests is supported.
 
-# The Setup
-
-@docs Model, Msg, init, update, subscriptions
 
 # Send Messages
 
 @docs Request
 @docs request, send
 
+
 # Chain Requests
 
 @docs andThen, andThenResult, map, map2, map3
+
 
 # Low-level Stuff
 
 @docs configToPorterConfig
 
- -}
+-}
 
 import Porter exposing (Model, Config)
 import Porter.Internals exposing (MultiRequest(..), Msg(..))
-import Json.Encode as Encode
-import Json.Decode as Decode
 import Result.Extra
-import Task
 
 
 {-| We can either:
@@ -52,21 +49,21 @@ import Task
   - Short-circuit; just pass on the value `a` without doing any more requests.
 
 -}
-type alias Request req res a = Porter.Internals.MultiRequest req res a
+type alias Request req res a =
+    Porter.Internals.MultiRequest req res a
+
+
+
 -- type Request req res a
-    -- = SimpleRequest (Porter.Request req res) (res -> a)
-    -- | ComplexRequest (Porter.Request req res) (res -> Request req res a)
-    -- | ShortCircuit a
-
-
+-- = SimpleRequest (Porter.Request req res) (res -> a)
+-- | ComplexRequest (Porter.Request req res) (res -> Request req res a)
+-- | ShortCircuit a
 -- | To configure Porter.Multi, you'll need:
-
 -- 1.  An outgoingPort of the correct type
 -- 2.  An incoming port of the correct type
 -- 3.  A way to encode the request type into JSON
 -- 4.  A way to decode the response JSON into an intermediate common 'res' type.
 -- 5.  A `msg` that will be used to perform the internal chaining of requests.
-
 -- type alias Config req res msg =
 --     { outgoingPort : Encode.Value -> Cmd msg
 --     , incomingPort : (Encode.Value -> Porter.Msg req res msg) -> Sub (Porter.Msg req res msg)
@@ -74,12 +71,8 @@ type alias Request req res a = Porter.Internals.MultiRequest req res a
 --     , decodeResponse : Decode.Decoder res
 --     , porterMultiMsg : Msg req res msg -> msg
 --     }
-
-
 -- {-| Allows us to perform low-level Porter calls using the Porter.Multi configuration
-
 -- Unless you know what you are doing, you probably don't need this ;-)
-
 -- -}
 -- configToPorterConfig : Config req res msg -> Porter.Config req res msg
 -- configToPorterConfig config =
@@ -89,26 +82,18 @@ type alias Request req res a = Porter.Internals.MultiRequest req res a
 --     , encodeRequest = config.encodeRequest
 --     , decodeResponse = config.decodeResponse
 --     }
-
-
 -- | The internal message type. Eiher:
-
 --   - A low level Porter message
 --   - One step in a multi-step request chain.
-
 -- type alias Msg req res msg = Porter.Msg req res msg
 -- type Msg req res msg
 --     = PorterMsg (Porter.Msg req res msg)
 --     | ResolveChain (Request req res msg)
-
-
 -- | The Porter.Multi Model is used to keep track of state
 -- across one or multiple port request<->response steps.
 -- type alias Model req res msg = Porter.Model req res msg
 -- type alias Model req res msg =
 --     { porter_model : Porter.Model req res msg }
-
-
 -- | Initializes a new Porter.Multi model.
 -- Should probably be called as part of your program's `init` call.
 -- init : Model req res msg
@@ -171,6 +156,7 @@ map : (a -> b) -> Request req res a -> Request req res b
 map mapfun req =
     Porter.Internals.multiMap mapfun req
 
+
 {-| Chains two requests, and then combines their two responses into one new `c`.
 -}
 map2 : (a -> b -> c) -> Request req res a -> Request req res b -> Request req res c
@@ -196,4 +182,3 @@ This `msg` will be called with the final resulting `a` once the final response h
 send : Config req res msg -> (a -> msg) -> Request req res a -> Cmd msg
 send config msg_handler request =
     Porter.Internals.multiSend config msg_handler request
-
