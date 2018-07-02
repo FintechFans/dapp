@@ -40,19 +40,20 @@ init location =
                 |> debug_send toString "complex_task; Fetching information of latest block."
     in
         model
-            ! [ eth_blocknum_task
-              , Web3.netVersion |> debug_send toString "netVersion"
-              , Web3.ethSyncing |> debug_send toString "ethSyncing"
-              , Web3.ethCoinbase |> debug_send toString "ethCoinbase"
-              , Web3.netListening |> debug_send toString "netListening"
-              , Web3.ethMining |> debug_send toString "ethMining"
-              , Web3.clientVersion |> debug_send toString "clientVersion"
-              , Web3.ethProtocolVersion |> debug_send toString "ethProtocolVersion"
-              , Web3.ethAccounts |> debug_send toString "ethAccounts"
-              , Web3.ethGasPrice |> debug_send bigint_debug_conversion "ethGasPrice"
-              , Web3.netPeerCount |> debug_send bigint_debug_conversion "netPeerCount"
-              , Web3.ethBlockNumber |> debug_send bigint_debug_conversion "ethBlockNumber"
-              , Web3.web3Sha3 "hello world" |> debug_send toString "web3Sha3 of 'hello world'"
+            ! [ Cmd.none
+              -- , eth_blocknum_task
+              -- , Web3.netVersion |> debug_send toString "netVersion"
+              -- , Web3.ethSyncing |> debug_send toString "ethSyncing"
+              -- , Web3.ethCoinbase |> debug_send toString "ethCoinbase"
+              -- , Web3.netListening |> debug_send toString "netListening"
+              -- , Web3.ethMining |> debug_send toString "ethMining"
+              -- , Web3.clientVersion |> debug_send toString "clientVersion"
+              -- , Web3.ethProtocolVersion |> debug_send toString "ethProtocolVersion"
+              -- , Web3.ethAccounts |> debug_send toString "ethAccounts"
+              -- , Web3.ethGasPrice |> debug_send bigint_debug_conversion "ethGasPrice"
+              -- , Web3.netPeerCount |> debug_send bigint_debug_conversion "netPeerCount"
+              -- , Web3.ethBlockNumber |> debug_send bigint_debug_conversion "ethBlockNumber"
+              -- , Web3.web3Sha3 "hello world" |> debug_send toString "web3Sha3 of 'hello world'"
               , complex_task
               ]
 
