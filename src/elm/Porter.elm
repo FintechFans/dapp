@@ -40,7 +40,7 @@ import Task
 import Json.Encode as Encode
 import Json.Decode as Decode
 
-import Porter.Types exposing (RequestWithHandler(..), Request(..), MultiRequest(..), Msg(..))
+import Porter.Internals exposing (RequestWithHandler(..), Request(..), MultiRequest(..), Msg(..))
 
 
 type alias MsgId =
@@ -63,7 +63,7 @@ type Model req res msg
   - the message that porter will use for its internal communications
 
 -}
-type alias Config req res msg = Porter.Types.Config req res msg
+type alias Config req res msg = Porter.Internals.Config req res msg
 -- type alias Config req res msg =
 --     { outgoingPort : Encode.Value -> Cmd msg
 --     , incomingPort : (Encode.Value -> Msg req res msg) -> Sub (Msg req res msg)
@@ -96,7 +96,7 @@ encode encodeReq id msg =
 
 {-| Module messages.
 -}
-type alias Msg req res msg = Porter.Types.Msg req res msg
+type alias Msg req res msg = Porter.Internals.Msg req res msg
 -- type Msg req res msg
 --     = SendWithNextId (RequestWithHandler req res msg)
 --     | Receive Encode.Value
@@ -105,7 +105,7 @@ type alias Msg req res msg = Porter.Types.Msg req res msg
 
 {-| Internal type used by requests that have a response handler.
 -}
-type alias RequestWithHandler req res msg = Porter.Types.RequestWithHandler req res msg
+type alias RequestWithHandler req res msg = Porter.Internals.RequestWithHandler req res msg
 -- type RequestWithHandler req res msg
 --     = RequestWithHandler req (List (res -> Request req res)) (res -> msg)
 
@@ -113,7 +113,7 @@ type alias RequestWithHandler req res msg = Porter.Types.RequestWithHandler req 
 {-| Opaque type of a 'request'. Use the `request` function to create one,
 chain them using `andThen` and finally send it using `send`.
 -}
-type alias Request req res = Porter.Types.Request req res
+type alias Request req res = Porter.Internals.Request req res
 -- type Request req res
 --     = Request req (List (res -> Request req res))
 
@@ -147,8 +147,8 @@ andThen reqfun (Request initialReq reqfuns) =
 
 send: Config req res msg -> (res -> msg) -> Request req res -> Cmd msg
 send config responseHandler request =
-    Porter.Types.internal_send config responseHandler request
-        
+    Porter.Internals.send config responseHandler request
+ 
 -- send: Config req res msg -> (res -> msg) -> Request req res -> Cmd msg
 -- send config responseHandler (Request req reqfuns) =
 --     runSendRequest config (RequestWithHandler req (List.reverse reqfuns) responseHandler)
@@ -232,7 +232,7 @@ update config msg (Model model) =
                     )
                 |> Result.withDefault ( Model model, Cmd.none )
         ResolveChain multi_request ->
-            ( Model model, Porter.Types.internal_multi_send config identity multi_request )
+            ( Model model, Porter.Internals.multiSend config identity multi_request )
 
 {-| Internal function that chains the steps of a RequestWithHandler after one another.
 -}
@@ -256,5 +256,5 @@ handleResponse config (Model model) id res (RequestWithHandler msg mappers final
                     reqMappers
             in
                 ( Model { model | handlers = Dict.remove id model.handlers }
-                , Porter.Types.internal_runSendRequest config (RequestWithHandler (extractMsg request) ((extractMappers request) ++ mappers) finalResponseHandler)
+                , Porter.Internals.runSendRequest config (RequestWithHandler (extractMsg request) ((extractMappers request) ++ mappers) finalResponseHandler)
                 )

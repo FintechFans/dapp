@@ -38,7 +38,7 @@ Wraps the `Porter` package to do the actual port-communication, but builds a lay
  -}
 
 import Porter exposing (Model, Config)
-import Porter.Types exposing (MultiRequest(..), Msg(..))
+import Porter.Internals exposing (MultiRequest(..), Msg(..))
 import Json.Encode as Encode
 import Json.Decode as Decode
 import Result.Extra
@@ -52,7 +52,7 @@ import Task
   - Short-circuit; just pass on the value `a` without doing any more requests.
 
 -}
-type alias Request req res a = Porter.Types.MultiRequest req res a
+type alias Request req res a = Porter.Internals.MultiRequest req res a
 -- type Request req res a
     -- = SimpleRequest (Porter.Request req res) (res -> a)
     -- | ComplexRequest (Porter.Request req res) (res -> Request req res a)
@@ -169,16 +169,7 @@ andThenResult reqfun req =
 -}
 map : (a -> b) -> Request req res a -> Request req res b
 map mapfun req =
-    case req of
-        SimpleRequest porter_req request_mapper ->
-            SimpleRequest porter_req (request_mapper >> mapfun)
-
-        ComplexRequest porter_req next_request_fun ->
-            ComplexRequest porter_req (\res -> map mapfun (next_request_fun res))
-
-        ShortCircuit val ->
-            ShortCircuit (mapfun val)
-
+    Porter.Internals.multiMap mapfun req
 
 {-| Chains two requests, and then combines their two responses into one new `c`.
 -}
@@ -204,5 +195,5 @@ This `msg` will be called with the final resulting `a` once the final response h
 -}
 send : Config req res msg -> (a -> msg) -> Request req res a -> Cmd msg
 send config msg_handler request =
-    Porter.Types.internal_multi_send config msg_handler request
+    Porter.Internals.multiSend config msg_handler request
 

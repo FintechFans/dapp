@@ -2,6 +2,7 @@ port module Web3 exposing (..)
 
 import Json.Encode as Encode
 import Json.Decode as Decode
+import Porter
 import Porter.Multi
 import BigInt exposing (BigInt)
 import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash, NetworkVersion, Syncing, BlockInfo)
@@ -21,7 +22,7 @@ config web3_msg =
     , incomingPort = incoming
     , encodeRequest = web3_call_encoder
     , decodeResponse = web3_call_decoder
-    , porterMultiMsg = web3_msg
+    , porterMsg = web3_msg
     }
 
 
@@ -61,7 +62,7 @@ web3_call_decoder =
 -}
 subscriptions : Config msg -> Sub msg
 subscriptions config =
-    Porter.Multi.subscriptions config
+    Porter.subscriptions config
 
 
 {-| Should be added to your application so Web3 is able to chain requests/responses made using its library.
@@ -70,7 +71,7 @@ update : Config msg -> Web3.Types.Message msg -> {a | web3_porter : Web3.Types.M
 update config incoming_msg model =
     let
         ( porter_model, porter_cmd ) =
-            Porter.Multi.update config incoming_msg model.web3_porter
+            Porter.update config incoming_msg model.web3_porter
     in
         -- Debug.log (toString porter_msg)
         ( { model | web3_porter = porter_model }, porter_cmd )
