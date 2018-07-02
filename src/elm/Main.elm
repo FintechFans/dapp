@@ -36,7 +36,7 @@ init location =
 
         complex_task =
             Web3.ethBlockNumber
-                |> Web3.andThen (\res -> Web3.ethGetBlockByNumber res True)
+                |> Web3.andThen (\res -> Web3.ethGetBlockByNumber res False)
                 |> debug_send toString "complex_task; Fetching information of latest block."
     in
         model

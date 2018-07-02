@@ -4,7 +4,7 @@ import Json.Encode as Encode
 import Json.Decode as Decode
 import Porter.Multi
 import BigInt exposing (BigInt)
-import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash, NetworkVersion, Syncing)
+import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash, NetworkVersion, Syncing, BlockInfo)
 import Web3.Utils
 import Web3.Decode
 
@@ -214,10 +214,10 @@ ethHashrate =
     request { method = "eth_hashrate", params = [] } Web3.Decode.big_int
 
 
-ethGetBlockByNumber : BigInt -> Bool -> Request Decode.Value
+ethGetBlockByNumber : BigInt -> Bool -> Request BlockInfo
 ethGetBlockByNumber block_number return_full_transaction_info =
     let
         num = block_number |> Web3.Utils.bigIntToHexQuantity |> Encode.string
         bool = Encode.bool return_full_transaction_info
     in
-        request { method = "eth_getBlockByNumber", params = [num, bool]} Decode.value
+        request { method = "eth_getBlockByNumber", params = [num, bool]} Web3.Decode.block_info
