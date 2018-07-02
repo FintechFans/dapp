@@ -113,10 +113,10 @@ send config msg_handler request =
 -- map : (Result Error resA -> Result Error resB) -> Request resA -> Request resB
 -- map result_handler (Web3.Types.Request porter_request original_result_handler)  = Web3.Types.Request porter_request (original_result_handler >> result_handler)
 
-andThen : (Result Error a -> Request b) -> Request a -> Request b
+andThen : (a -> Request b) -> Request a -> Request b
 andThen fun res_a =
     res_a
-        |> Porter.Multi.andThen fun
+        |> Porter.Multi.andThenResult fun
 
 {-| Internal function that decodes the result of a JSON-RPC call,
 mapping JSON-RPC error codes to their proper Web3.Types.Error instance,

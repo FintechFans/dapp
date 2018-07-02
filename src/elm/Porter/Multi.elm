@@ -3,11 +3,14 @@ module Porter.Multi exposing (..)
 import Porter
 import Json.Encode as Encode
 import Json.Decode as Decode
+import Result.Extra
+import Task
 
 
 type Request req res a
     = SimpleRequest (Porter.Request req res) (res -> a)
     | ComplexRequest (Porter.Request req res) (res -> Request req res a)
+    | ShortCircuit a
 
 
 type alias Config req res msg =
@@ -57,6 +60,22 @@ andThen reqfun req =
         ComplexRequest porter_req next_request_fun ->
             ComplexRequest porter_req (\res -> andThen reqfun (next_request_fun res))
 
+        ShortCircuit val -> reqfun val
+
+andThenResult : (a -> Request req res (Result err b)) -> Request req res (Result err a) -> Request req res (Result err b)
+andThenResult reqfun req =
+    case req of
+        ShortCircuit (Err val) -> ShortCircuit (Err val)
+        ShortCircuit (Ok val) -> (reqfun val)
+
+        SimpleRequest porter_req request_mapper ->
+            ComplexRequest (porter_req) (
+                                             request_mapper >> Result.Extra.unpack (ShortCircuit << Err) (reqfun)
+                                        )
+
+        ComplexRequest porter_req next_request_fun ->
+            ComplexRequest porter_req (\res -> andThenResult reqfun (next_request_fun res))
+
 
 map : (a -> b) -> Request req res a -> Request req res b
 map mapfun req =
@@ -66,6 +85,7 @@ map mapfun req =
 
         ComplexRequest porter_req next_request_fun ->
             ComplexRequest porter_req (\res -> map mapfun (next_request_fun res))
+        ShortCircuit val -> ShortCircuit (mapfun val)
 
 
 map2 : (a -> b -> c) -> Request req res a -> Request req res b -> Request req res c
@@ -95,6 +115,10 @@ send config msg_handler request =
                         config.porterMultiMsg (ResolveChain (next_request_fun res))
                 in
                     Porter.send (configToPorterConfig config) resfun porter_req
+            ShortCircuit val ->
+                val
+                    |> Task.succeed
+                    |> Task.perform identity
 
 
 update : Config req res msg -> Msg req res msg -> Model req res msg -> ( Model req res msg, Cmd msg )
