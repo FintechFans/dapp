@@ -2,7 +2,6 @@ port module Web3 exposing (..)
 
 import Json.Encode as Encode
 import Json.Decode as Decode
-import Porter
 import Porter.Multi
 import BigInt exposing (BigInt)
 import Web3.Types exposing (Web3RPCCall, Web3RPCResponse(..), Request, Config, Error, Address, UnformattedData, Sha3Hash, NetworkVersion, Syncing)

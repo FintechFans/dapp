@@ -1,6 +1,5 @@
 module Web3.Types exposing (..)
 
-import Porter
 import Porter.Multi
 import Json.Decode as Decode
 import Json.Encode as Encode

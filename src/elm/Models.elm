@@ -4,7 +4,6 @@ import Dict exposing (Dict)
 import Html exposing (Html)
 
 import Eth.Types
-import Porter
 import Msgs exposing (Msg)
 import Web3.Types
 

@@ -3,6 +3,7 @@ module Routing exposing (..)
 import Navigation
 import Models exposing (ListingId, Route(..))
 import UrlParser exposing ((</>))
+import Html
 import Html.Events
 import Json.Decode
 import Msgs
@@ -33,6 +34,7 @@ parseLocation location =
         Nothing ->
             NotFoundRoute
 
+linkTo : String -> Html.Attribute Msgs.Msg
 linkTo path = Html.Events.onWithOptions "click" { stopPropagation = True, preventDefault = True } (Json.Decode.succeed (Msgs.NavigateTo path))
 
 listingsPath : String
