@@ -10,9 +10,7 @@ module Porter.Multi
         , send
         )
 
-{-|
-
-With `Porter.Multi` you can create requests that have specialized return values.
+{-| With `Porter.Multi` you can create requests that have specialized return values.
 Use this if the normal response types are not good enough for you.
 
 The setup is exactly the same as when using Porter normally; and just use the `request` and `send` commands that this module provides instead to create requests with specialized return types.
