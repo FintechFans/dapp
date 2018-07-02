@@ -4,17 +4,12 @@ module Porter
         , Config
         , Msg
         , Request
-        , RequestWithHandler
         , subscriptions
         , init
         , update
         , send
         , request
-        , fancyRequest
         , andThen
-        , map
-        , map2
-        , map3
         )
 
 {-| Port message manager to emulate a request-response style communication through ports, a'la `Http.send ResponseHandler request`.
@@ -33,10 +28,6 @@ module Porter
 
 @docs Request
 @docs request, andThen, send
-
-# Modify received responses before turning them back into messages
-
-@docs map, map2, map3
 
 
 
@@ -111,15 +102,14 @@ type Msg req res msg
 {-| Internal type used by requests that have a response handler.
 -}
 type RequestWithHandler req res msg
-    = RequestWithHandler req (List (res -> RequestWithHandler req res res)) (res -> msg)
+    = RequestWithHandler req (List (res -> Request req res)) (res -> msg)
 
 
 {-| Opaque type of a 'request'. Use the `request` function to create one,
 chain them using `andThen` and finally send it using `send`.
 -}
-type alias Request req res
-    -- = Request req (List (res -> Request req res))
-    = RequestWithHandler req res res
+type Request req res
+    = Request req (List (res -> Request req res))
 
 
 {-| Subscribe to messages from ports.
@@ -135,41 +125,22 @@ and that can be combined using `andThen`.
 -}
 request : req -> Request req res
 request req =
-    RequestWithHandler req [] identity
-
-fancyRequest : req -> (res -> a) -> RequestWithHandler req res a
-fancyRequest req customHandler = RequestWithHandler req [] customHandler
+    Request req []
 
 
 {-| Chains two Porter requests together:
 Run a second one right away when the first returns using its result in the request.
 -}
 andThen : (res -> Request req res) -> Request req res -> Request req res
-andThen reqfun (RequestWithHandler initial_req reqfuns responseFun) =
-    RequestWithHandler initial_req (reqfun :: reqfuns) responseFun
-
-
-map : (res -> res) -> Request req res -> Request req res
-map func (RequestWithHandler request reqfuns responseFun) =
-    RequestWithHandler request reqfuns (responseFun >> func)
-
-map2 : (res -> res -> res) -> Request req res -> Request req res -> Request req res
-map2 func resA resB =
-    resA
-        |> andThen (\a -> map (func a) resB)
-
-
-map3 : (res -> res -> res -> res) -> Request req res -> Request req res -> Request req res -> Request req res
-map3 func resA resB resC =
-    resA
-        |> andThen (\a -> map2 (func a) resB resC)
+andThen reqfun (Request initialReq reqfuns) =
+    Request initialReq (reqfun :: reqfuns)
 
 
 {-| Sends a request earlier started using `request`.
 -}
-send : Config req res msg -> (a -> msg) -> RequestWithHandler req res a -> Cmd msg
-send config response_handler (RequestWithHandler req reqfuns responseFun) =
-    runSendRequest config (RequestWithHandler req (List.reverse reqfuns) (responseFun >> response_handler))
+send: Config req res msg -> (res -> msg) -> Request req res -> Cmd msg
+send config responseHandler (Request req reqfuns) =
+    runSendRequest config (RequestWithHandler req (List.reverse reqfuns) responseHandler)
 
 
 {-| Internal function that performs the specified request as a command.
@@ -266,10 +237,10 @@ handleResponse config (Model model) id res (RequestWithHandler msg mappers final
                 request =
                     mapper res
 
-                extractMsg (RequestWithHandler msg _ _) =
+                extractMsg (Request msg _) =
                     msg
 
-                extractMappers (RequestWithHandler _ reqMappers _) =
+                extractMappers (Request _ reqMappers) =
                     reqMappers
             in
                 ( Model { model | handlers = Dict.remove id model.handlers }

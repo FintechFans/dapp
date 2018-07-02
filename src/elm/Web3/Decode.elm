@@ -2,7 +2,7 @@ module Web3.Decode exposing (..)
 
 import Json.Decode as Decode
 import Json.Decode.Extra as DecodeExtra
-import Json.Decode.Pipeline
+import Json.Decode.Pipeline as Pipeline
 import Result
 import BigInt exposing (BigInt)
 import Web3.Types exposing (UnformattedData, Error(..), Address, NetworkVersion(..), TestnetVersion(..), Syncing(..), BlockInfo)
@@ -67,24 +67,24 @@ syncing =
         Decode.oneOf [false_decoder, syncing_obj_decoder]
 
 block_info : Decode.Decoder BlockInfo
-block_info = 
-    Json.Decode.Pipeline.decode BlockInfo
-        |> Json.Decode.Pipeline.required "number" (Decode.nullable big_int)
-        |> Json.Decode.Pipeline.required "hash" (Decode.nullable Decode.string)
-        |> Json.Decode.Pipeline.required "parentHash" Decode.string
-        |> Json.Decode.Pipeline.required "nonce" (Decode.nullable Decode.string)
-        |> Json.Decode.Pipeline.required "sha3Uncles" Decode.string
-        |> Json.Decode.Pipeline.required "logsBloom" Decode.string
-        |> Json.Decode.Pipeline.required "transactionsRoot" Decode.string
-        |> Json.Decode.Pipeline.required "stateRoot" Decode.string
-        |> Json.Decode.Pipeline.required "receiptsRoot" Decode.string
-        |> Json.Decode.Pipeline.required "miner" address
-        |> Json.Decode.Pipeline.required "difficulty" big_int
-        |> Json.Decode.Pipeline.required "totalDifficulty" big_int
-        |> Json.Decode.Pipeline.required "extraData" Decode.string
-        |> Json.Decode.Pipeline.required "size" big_int
-        |> Json.Decode.Pipeline.required "gasLimit" big_int
-        |> Json.Decode.Pipeline.required "gasUsed" big_int
-        |> Json.Decode.Pipeline.required "timestamp" big_int
-        |> Json.Decode.Pipeline.required "transactions" (Decode.list Decode.value)
-        |> Json.Decode.Pipeline.required "uncles" (Decode.list Decode.value)
+block_info =
+    Pipeline.decode BlockInfo
+        |> Pipeline.required "number" (Decode.nullable big_int)
+        |> Pipeline.required "hash" (Decode.nullable Decode.string)
+        |> Pipeline.required "parentHash" Decode.string
+        |> Pipeline.required "nonce" (Decode.nullable Decode.string)
+        |> Pipeline.required "sha3Uncles" Decode.string
+        |> Pipeline.required "logsBloom" Decode.string
+        |> Pipeline.required "transactionsRoot" Decode.string
+        |> Pipeline.required "stateRoot" Decode.string
+        |> Pipeline.required "receiptsRoot" Decode.string
+        |> Pipeline.required "miner" address
+        |> Pipeline.required "difficulty" big_int
+        |> Pipeline.required "totalDifficulty" big_int
+        |> Pipeline.required "extraData" Decode.string
+        |> Pipeline.required "size" big_int
+        |> Pipeline.required "gasLimit" big_int
+        |> Pipeline.required "gasUsed" big_int
+        |> Pipeline.required "timestamp" big_int
+        |> Pipeline.required "transactions" (Decode.list Decode.value)
+        |> Pipeline.required "uncles" (Decode.list Decode.value)
