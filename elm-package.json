@@ -21,6 +21,7 @@
         "evancz/url-parser": "2.0.1 <= v < 3.0.0",
         "hickscorp/elm-bigint": "1.0.2 <= v < 2.0.0",
         "mgold/elm-nonempty-list": "3.1.0 <= v < 4.0.0",
+        "peterszerzo/elm-porter": "2.1.0 <= v < 3.0.0",
         "rtfeldman/hex": "1.0.0 <= v < 2.0.0"
     },
     "elm-version": "0.18.0 <= v < 0.19.0"

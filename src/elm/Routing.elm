@@ -17,6 +17,7 @@ matchers =
         , UrlParser.map ListingsRoute (UrlParser.s "listings")
         ]
 
+toPath : Route -> String
 toPath route =
     case route of
         ListingsRoute ->
