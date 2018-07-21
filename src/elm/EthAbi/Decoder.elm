@@ -1,11 +1,11 @@
-module EthAbi.Decoder exposing (int128, uint256, bool, static_bytes)
+module EthAbi.Decoder exposing (int256, uint256, bool, static_bytes)
 
 import Char
 import Hex
 import List.Extra
 import Result.Extra
 import BigInt
-import EthAbi.Types exposing (Int128, UInt256, Bytes32)
+import EthAbi.Types exposing (Int256, UInt256, Bytes32)
 
 
 type alias EthAbiDecoder t =
@@ -22,16 +22,25 @@ map fun decoder =
     decoder >> Result.map fun
 
 
+map2 : (a -> b -> c) -> EthAbiDecoder a -> EthAbiDecoder b -> EthAbiDecoder b
+map2 fun decodera decoderb =
+    Result.map2 decodera decoderb fun
+
+decode : a -> EthAbiDecoder a
+decode =
+    succeed
+
+
 
 -- TODO two's complement
 
 
-int128 : EthAbiDecoder Int128
-int128 hexstr =
+int256 : EthAbiDecoder Int256
+int256 hexstr =
     hexstr
         |> ensureSingleWord
         |> Result.andThen hexToBigInt
-        |> Result.andThen EthAbi.Types.int128
+        |> Result.andThen EthAbi.Types.int256
 
 
 uint256 : EthAbiDecoder UInt256
@@ -110,3 +119,5 @@ ensureSingleWord hexstr =
         Ok hexstr
     else
         Err "Given ABI hexadecimal string is not 256 bits"
+
+tupleTODO = Decode.map2

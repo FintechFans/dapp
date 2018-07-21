@@ -4,23 +4,23 @@ import BigInt exposing (BigInt)
 import Result exposing (Result)
 
 
-type Int128
-    = Int128 BigInt
+type Int256
+    = Int256 BigInt
 
 
-int : Int -> BigInt -> Result String Int128
+int : Int -> BigInt -> Result String Int256
 int len integer =
     let
         ensureLenIsPowerOfTwo len integer =
-            if List.member len [ 8, 16, 32, 64, 128 ] then
+            if len > 0 && len < 256 && len % 8 == 0 then
                 Ok integer
             else
-                Err ("Int128 length should be a multiple of 2 and between 8 and 128, but is " ++ (toString len))
+                Err ("Int256 length should be a multiple of 2 and between 8 and 128, but is " ++ (toString len))
     in
         integer
             |> ensureLenIsPowerOfTwo len
-            |> Result.andThen (ensureIntegerFits len)
-            |> Result.map (Int128)
+            |> Result.andThen (ensureIntegerFits (len - 1))
+            |> Result.map (Int256)
 
 
 int8 =
@@ -42,8 +42,10 @@ int64 =
 int128 =
     int 128
 
+int256 =
+    int 256
 
-int128ToBigInt (Int128 big_int) = big_int
+int256ToBigInt (Int256 big_int) = big_int
 
 type UInt256
     = UInt256 BigInt
@@ -53,7 +55,7 @@ uint : Int -> BigInt -> Result String UInt256
 uint len integer =
     let
         ensureLenIsPowerOfTwo len integer =
-            if List.member len [ 8, 16, 32, 64, 128, 256 ] then
+            if len > 0 && len < 256 && len % 8 == 0 then
                 Ok integer
             else
                 Err ("UInt256 length should be a multiple of 2 and between 8 and 128, but is " ++ (toString len))
@@ -114,7 +116,7 @@ bytes : Int -> String -> Result String Bytes32
 bytes len str =
     let
         ensureLenIsPowerOfTwo len str =
-            if List.member len [ 2, 4, 8, 16, 32 ] then
+            if len > 0 && len < 256 && len % 8 == 0 then
                 Ok str
             else
                 Err ("Bytes length should be a multiple of two, but it is " ++ (toString len))
