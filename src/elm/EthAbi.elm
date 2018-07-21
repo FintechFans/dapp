@@ -3,6 +3,7 @@ module EthAbi exposing (..)
 import Char
 import Hex
 import List.Extra
+import Result.Extra
 
 
 {-| TODO using BigInts where required
@@ -223,6 +224,17 @@ strToBytes str =
         |> List.map (Char.toCode >> Hex.toString >> String.padLeft 2 '0')
         |> String.join ""
 
+bytesToStr : String -> Result String String
+bytesToStr bytes =
+    let
+        -- two hexchars -> 0..255 -> char
+        byteToChar = (Hex.fromString >> Result.map (Char.fromCode))
+    in
+    bytes
+        |> stringGroupsOf 2
+        |> List.map byteToChar
+        |> Result.Extra.combine
+        |> Result.map String.fromList
 
 static_encode : AbiStaticType -> String
 static_encode val =
@@ -267,12 +279,44 @@ static_encode val =
 decode_args : List AbiSpec -> String -> Result String AbiType
 decode_args spec val =
     let
-        words = val |> String.toList |> List.Extra.groupsOf 32 |> (List.map String.fromList)
+        words = val |> stringGroupsOf 64
         spec_length = List.length spec
-        args_head = List.Extra.zip spec words
+        -- TODO: Following line is wrong. Static array and tuples take multiple words from the head at once.
+        -- args_head = List.Extra.zip spec words
+        -- args_head = words |> List.foldl ()
         args_tail = List.drop spec_length words
     in
         Err "TODO"
+
+treeize_head : List String -> List AbiSpec -> List (AbiSpec, List String) -> List (AbiSpec, List String)
+
+treeize_head words specs acc =
+    case specs of
+        [] -> acc
+        (spec :: specs) ->
+            let
+                (spec_words, other_words) = words |> List.Extra.splitAt 10
+            in
+                treeize_head other_words specs ((spec, spec_words) :: acc)
+
+
+num_head_elems : AbiSpec -> Int
+num_head_elems spec =
+    case spec of
+        -- simple static types:
+        AbiSUint -> 1
+        AbiSInt -> 1
+        AbiSBool -> 1
+        -- complex static types:
+        AbiSStaticBytes len -> len
+        AbiSStaticArray len _ -> len
+        AbiSStaticTuple len _ -> len
+        -- dynamic types:
+        AbiSBytes -> 1
+        AbiSString -> 1
+        AbiSDynamicArray _ -> 1
+        AbiSArray _ _ -> 1 -- is this correct?
+        AbiSDynamicTuple _ -> 1
 
 decode_arg : AbiSpec -> String -> Result String AbiType
 decode_arg spec val =
@@ -298,3 +342,11 @@ decode_arg spec val =
               |> Result.andThen intToBool
               |> Result.map (Static << AbiBool)
             _ -> Err "Not supported yet"
+
+
+stringGroupsOf : Int -> String -> List String
+stringGroupsOf num str =
+    str
+        |> String.toList
+        |> List.Extra.groupsOf num
+        |> List.map String.fromList
