@@ -4,23 +4,23 @@ import BigInt exposing (BigInt)
 import Result exposing (Result)
 
 
-type Int256
-    = Int256 BigInt
+type Int128
+    = Int128 BigInt
 
 
-int : Int -> BigInt -> Result String Int256
+int : Int -> BigInt -> Result String Int128
 int len integer =
     let
         ensureLenIsPowerOfTwo len integer =
             if List.member len [ 8, 16, 32, 64, 128 ] then
                 Ok integer
             else
-                Err ("Int256 length should be a multiple of 2 and between 8 and 128, but is " ++ (toString len))
+                Err ("Int128 length should be a multiple of 2 and between 8 and 128, but is " ++ (toString len))
     in
         integer
             |> ensureLenIsPowerOfTwo len
             |> Result.andThen (ensureIntegerFits len)
-            |> Result.map (Int256)
+            |> Result.map (Int128)
 
 
 int8 =
@@ -43,6 +43,8 @@ int128 =
     int 128
 
 
+int128ToBigInt (Int128 big_int) = big_int
+
 type UInt256
     = UInt256 BigInt
 
@@ -60,7 +62,7 @@ uint len integer =
             if BigInt.gte integer (BigInt.fromInt 0) then
                 Ok integer
             else
-                Err ("Uint256 called with a negative value: " ++ toString integer)
+                Err ("UInt256 called with a negative value: " ++ toString integer)
     in
         integer
             |> ensureLenIsPowerOfTwo len
@@ -68,6 +70,29 @@ uint len integer =
             |> Result.andThen (ensureIntegerFits len)
             |> Result.map (UInt256)
 
+uint8 =
+    uint 8
+
+
+uint16 =
+    uint 16
+
+
+uint32 =
+    uint 32
+
+
+uint64 =
+    uint 64
+
+
+uint128 =
+    uint 128
+
+uint256 =
+    uint 256
+
+uint256ToBigInt (UInt256 big_int) = big_int
 
 ensureIntegerFits : Int -> BigInt -> Result String BigInt
 ensureIntegerFits len integer =
