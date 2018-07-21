@@ -12,7 +12,7 @@ int : Int -> BigInt -> Result String Int256
 int len integer =
     let
         ensureLenIsInRange len integer =
-            if len > 0 && len < 256 && len % 8 == 0 then
+            if len > 0 && len <= 256 && len % 8 == 0 then
                 Ok integer
             else
                 Err ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
@@ -56,7 +56,7 @@ uint : Int -> BigInt -> Result String UInt256
 uint len integer =
     let
         ensureLenIsInRange len integer =
-            if len > 0 && len < 256 && len % 8 == 0 then
+            if len > 0 && len <= 256 && len % 8 == 0 then
                 Ok integer
             else
                 Err ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
@@ -104,7 +104,7 @@ ensureIntegerFits len integer =
         len_bits len =
             BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt len)
     in
-        if BigInt.gte (BigInt.abs integer) (len_bits len) then
+        if BigInt.lte (BigInt.abs integer) (len_bits len) then
             Ok integer
         else
             Err ("Integer too large to fit in " ++ toString len ++ " bits")
