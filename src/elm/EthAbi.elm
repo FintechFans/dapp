@@ -71,6 +71,7 @@ type AbiSpec
     | AbiSArray Int AbiSpec
     | AbiSDynamicTuple Int
 
+-- TODO introduce Int256 and Uint256 types, that are convertable to and from normal Ints and BigInts, with the resp. calls returning Results in the case this is not possible because they are too big or negative.
 uint : Int -> Result String AbiStaticType
 uint int =
     if int < 0 then
