@@ -5,13 +5,28 @@ import Hex
 import List.Extra
 import Result.Extra
 import BigInt
-import EthAbi.Types exposing (Int128, Uint256)
+import EthAbi.Types exposing (Int128, UInt256, Bytes32)
+
+
+type alias EthAbiDecoder t =
+    String -> Result String t
+
+succeed : a -> EthAbiDecoder a
+succeed val = \_ -> Ok val
+
+fail : String -> EthAbiDecoder a
+fail error_message = \_ -> Err error_message
+
+map : (a -> b) -> EthAbiDecoder a -> EthAbiDecoder b
+map fun decoder =
+    decoder >> Result.map fun
+
 
 
 -- TODO two's complement
 
 
-int128 : String -> Result String Int128
+int128 : EthAbiDecoder Int128
 int128 hexstr =
     hexstr
         |> ensureSingleWord
@@ -19,7 +34,7 @@ int128 hexstr =
         |> Result.andThen EthAbi.Types.int128
 
 
-uint256 : String -> Result String Uint256
+uint256 : EthAbiDecoder UInt256
 uint256 hexstr =
     hexstr
         |> ensureSingleWord
@@ -27,7 +42,7 @@ uint256 hexstr =
         |> Result.andThen EthAbi.Types.uint256
 
 
-bool : String -> Result String Bool
+bool : EthAbiDecoder Bool
 bool hexstr =
     let
         intToBool num =
@@ -47,11 +62,13 @@ bool hexstr =
             |> Result.andThen intToBool
 
 
+static_bytes : Int -> EthAbiDecoder Bytes32
 static_bytes len hexstr =
     hexstr
         |> ensureSingleWord
         |> Result.map (trimBytesRight len)
         |> Result.andThen bytesToStr
+        |> Result.andThen (EthAbi.Types.bytes len)
 
 
 trimBytesLeft len str =
