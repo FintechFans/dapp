@@ -276,7 +276,7 @@ static_encode val =
                 |> String.concat
 
 
-decode_args : List AbiSpec -> String -> Result String AbiType
+decode_args : List AbiSpec -> String -> Result String (List AbiType)
 decode_args spec val =
     let
         words = val |> stringGroupsOf 64
@@ -286,7 +286,9 @@ decode_args spec val =
         args_head = group_spec_with_proper_head_words words spec []
         args_tail = List.drop spec_length words
     in
-        Err "TODO"
+        args_head
+            |> List.map (\(spec, head) -> decode_arg spec head words)
+            |> Result.Extra.combine
 
 -- TODO test implementation
 group_spec_with_proper_head_words : List String -> List AbiSpec -> List (AbiSpec, List String) -> List (AbiSpec, List String)
@@ -308,8 +310,8 @@ num_head_elems spec =
         AbiSUint -> 1
         AbiSInt -> 1
         AbiSBool -> 1
+        AbiSStaticBytes _ -> 1
         -- complex static types:
-        AbiSStaticBytes len -> len
         AbiSStaticArray len _ -> len
         AbiSStaticTuple len _ -> len
         -- dynamic types:
@@ -319,8 +321,8 @@ num_head_elems spec =
         AbiSArray _ _ -> 1 -- is this correct?
         AbiSDynamicTuple _ -> 1
 
-decode_arg : AbiSpec -> String -> Result String AbiType
-decode_arg spec val =
+decode_arg : AbiSpec -> List String -> List String -> Result String AbiType
+decode_arg spec val words =
     let
         intToBool num = case num of
                          0 -> Ok False
@@ -329,21 +331,40 @@ decode_arg spec val =
     in
         case spec of
             AbiSUint ->
-                val
-                     |> Hex.fromString
-                     |> Result.map (Static << AbiUint)
+                case val of
+                    [val] ->
+                        val
+                            |> Hex.fromString
+                            |> Result.map (Static << AbiUint)
+                    _ -> Err "AbiSUint argument larger than expected"
             AbiSInt ->
               -- TODO two's complement!
-              val
-                  |> Hex.fromString
-                  |> Result.map (Static << AbiInt)
+                case val of
+                    [val] ->
+                        val
+                            |> Hex.fromString
+                            |> Result.map (Static << AbiInt)
+                    _ -> Err "AbiSInt argument larger than expected"
             AbiSBool ->
-              val
-              |> Hex.fromString
-              |> Result.andThen intToBool
-              |> Result.map (Static << AbiBool)
+                case val of
+                    [val] ->
+                        val
+                            |> Hex.fromString
+                            |> Result.andThen intToBool
+                            |> Result.map (Static << AbiBool)
+                    _ -> Err "AbiSBool argument larger than expected"
+            AbiSStaticBytes len ->
+                case val of
+                    [val] ->
+                        val
+                            |> trimBytesRight len
+                            |> bytesToStr
+                            |> Result.map(Static << AbiStaticBytes len)
+                    _ -> Err "AbiSStaticBytes argument larger than expected"
             _ -> Err "Not supported yet"
 
+trimBytesLeft len str = String.dropLeft (64 - (2 * len)) str
+trimBytesRight len str = String.dropRight (64 - (2 * len)) str
 
 stringGroupsOf : Int -> String -> List String
 stringGroupsOf num str =
