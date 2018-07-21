@@ -2,6 +2,7 @@ module EthAbi exposing (..)
 
 import Char
 import Hex
+import List.Extra
 
 
 {-| TODO using BigInts where required
@@ -56,6 +57,18 @@ type
       -- An tuple where one of the elements has to be Dynamic:
     | AbiDynamicTuple Int (List AbiType)
 
+type AbiSpec
+    = AbiSUint
+    | AbiSInt
+    | AbiSBool
+    | AbiSStaticBytes Int
+    | AbiSStaticArray Int AbiSpec
+    | AbiSStaticTuple Int AbiSpec
+    | AbiSBytes
+    | AbiSString
+    | AbiSDynamicArray AbiSpec
+    | AbiSArray Int AbiSpec
+    | AbiSDynamicTuple Int
 
 uint : Int -> Result String AbiStaticType
 uint int =
@@ -64,7 +77,52 @@ uint int =
     else
         Ok (AbiUint int)
 
+static_array len vals =
+    -- ensure not empty
+    -- ensure length same as given length
+    -- ensure all elements the same as first element
+    case vals of
+        [] -> Err "Empty list passed to static_array"
+        (hd :: rest) ->
+            let
+                all_same_type =
+                    rest
+                        |> List.map caseNameStatic
+                        |> List.all (\x -> x == (caseNameStatic hd))
+            in
+                if not all_same_type then
+                    Err "All values passed to static_array should be of the same type"
+                else
+                    if not (len == List.length vals) then
+                        Err "Given length is different than the amount of passed values"
+                    else
+                    Ok (AbiStaticArray len vals)
 
+
+caseNameStatic : AbiStaticType -> String
+caseNameStatic val =
+    case val of
+        AbiUint _ -> "AbiUint"
+        AbiInt _ -> "AbiInt"
+        AbiBool _ -> "AbiBool"
+        AbiStaticBytes len _ -> "AbiStaticBytes " ++ (toString len)
+        AbiStaticArray len _ -> "AbiStaticArray " ++ (toString len)
+        AbiStaticTuple len _ -> "AbiStaticTuple " ++ (toString len) -- TODO?
+
+caseNameDynamic : AbiDynamicType -> String
+caseNameDynamic val =
+    case val of
+        AbiBytes _ -> "AbiBytes"
+        AbiString _ -> "AbiString"
+        AbiDynamicArray _ -> "AbiDynamicArray"
+        AbiArray len _ -> "AbiArray " ++ (toString len)
+        AbiDynamicTuple len _ -> "AbiDynamicTuple " ++ (toString len) -- TODO?
+
+caseName : AbiType -> String
+caseName val =
+    case val of
+        Static s -> "Static " ++ caseNameStatic s
+        Dynamic d -> "Dynamic " ++ caseNameDynamic d
 
 {-
    32 bytes == 64 hexadecimal characters
@@ -199,8 +257,44 @@ static_encode val =
                 |> padRightTo32Bytes '0'
         AbiStaticArray len vals ->
             static_encode (AbiStaticTuple len vals)
- 
+
         AbiStaticTuple _ vals ->
             vals
                 |> List.map static_encode
                 |> String.concat
+
+
+decode_args : List AbiSpec -> String -> Result String AbiType
+decode_args spec val =
+    let
+        words = val |> String.toList |> List.Extra.groupsOf 32 |> (List.map String.fromList)
+        spec_length = List.length spec
+        args_head = List.Extra.zip spec words
+        args_tail = List.drop spec_length words
+    in
+        Err "TODO"
+
+decode_arg : AbiSpec -> String -> Result String AbiType
+decode_arg spec val =
+    let
+        intToBool num = case num of
+                         0 -> Ok False
+                         1 -> Ok True
+                         _ -> Err "Impossible to convert ABI-encoded value to boolean, not '0' or '1'"
+    in
+        case spec of
+            AbiSUint ->
+                val
+                     |> Hex.fromString
+                     |> Result.map (Static << AbiUint)
+            AbiSInt ->
+              -- TODO two's complement!
+              val
+                  |> Hex.fromString
+                  |> Result.map (Static << AbiInt)
+            AbiSBool ->
+              val
+              |> Hex.fromString
+              |> Result.andThen intToBool
+              |> Result.map (Static << AbiBool)
+            _ -> Err "Not supported yet"
