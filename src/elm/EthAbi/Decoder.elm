@@ -4,27 +4,75 @@ import Char
 import Hex
 import List.Extra
 import Result.Extra
-import BigInt
+import BigInt exposing (BigInt)
 import EthAbi.Types exposing (Int256, UInt256, Bytes32)
 
 
+type AbiParamModifier
+    = Static
+    | Dynamic
+
+
 type alias EthAbiDecoder t =
-    String -> Result String t
+    ( AbiParamModifier, String -> Result String t )
+
 
 succeed : a -> EthAbiDecoder a
-succeed val = \_ -> Ok val
+succeed val =
+    ( Static, \_ -> Ok val )
+
 
 fail : String -> EthAbiDecoder a
-fail error_message = \_ -> Err error_message
+fail error_message =
+    ( Static, \_ -> Err error_message )
+
 
 map : (a -> b) -> EthAbiDecoder a -> EthAbiDecoder b
-map fun decoder =
-    decoder >> Result.map fun
+map fun ( abi_param_modifier, decoderfun ) =
+    ( abi_param_modifier, decoderfun >> Result.map fun )
 
 
-map2 : (a -> b -> c) -> EthAbiDecoder a -> EthAbiDecoder b -> EthAbiDecoder b
-map2 fun decodera decoderb =
-    Result.map2 decodera decoderb fun
+
+-- TODO does modifier get propagated here properly?
+
+
+andThen : (a -> EthAbiDecoder b) -> EthAbiDecoder a -> EthAbiDecoder b
+andThen fun ( modifier, decoderfun ) =
+    let
+        compoundfun =
+            \hexstring ->
+                case decoderfun hexstring of
+                    Err err ->
+                        Err err
+
+                    Ok res ->
+                        run (fun res) hexstring
+    in
+        ( modifier, compoundfun )
+
+
+run : EthAbiDecoder t -> String -> Result String t
+run ( modifier, decoder ) hexstring =
+    decoder hexstring
+
+
+map2 : (a -> b -> c) -> EthAbiDecoder a -> EthAbiDecoder b -> EthAbiDecoder c
+map2 fun (ma, da) (mb, db) =
+    let
+        modifier = case (ma, mb) of
+                       (Static, Static) -> Static
+                       (_ , _) -> Dynamic
+        mapped_fun =
+            \hexstring ->
+                case da hexstring of
+                    Err err -> Err err
+                    Ok res -> run (map (fun res) (mb, db)) hexstring
+    in
+        (modifier, mapped_fun)
+
+    -- da
+        -- |> andThen (\resa -> db |> map (fun resa))
+
 
 decode : a -> EthAbiDecoder a
 decode =
@@ -36,23 +84,29 @@ decode =
 
 
 int256 : EthAbiDecoder Int256
-int256 hexstr =
-    hexstr
-        |> ensureSingleWord
-        |> Result.andThen hexToBigInt
-        |> Result.andThen EthAbi.Types.int256
+int256 =
+    ( Static
+    , \hexstr ->
+        hexstr
+            |> ensureSingleWord
+            |> Result.andThen hexToBigInt
+            |> Result.andThen EthAbi.Types.int256
+    )
 
 
 uint256 : EthAbiDecoder UInt256
-uint256 hexstr =
-    hexstr
-        |> ensureSingleWord
-        |> Result.andThen hexToBigInt
-        |> Result.andThen EthAbi.Types.uint256
+uint256 =
+    ( Static
+    , \hexstr ->
+        hexstr
+            |> ensureSingleWord
+            |> Result.andThen hexToBigInt
+            |> Result.andThen EthAbi.Types.uint256
+    )
 
 
 bool : EthAbiDecoder Bool
-bool hexstr =
+bool =
     let
         intToBool num =
             case num of
@@ -65,29 +119,37 @@ bool hexstr =
                 _ ->
                     Err "Impossible to convert ABI-encoded value to boolean, not '0' or '1'"
     in
-        hexstr
-            |> ensureSingleWord
-            |> Result.andThen Hex.fromString
-            |> Result.andThen intToBool
+        ( Static
+        , \hexstr ->
+            hexstr
+                |> ensureSingleWord
+                |> Result.andThen Hex.fromString
+                |> Result.andThen intToBool
+        )
 
 
 static_bytes : Int -> EthAbiDecoder Bytes32
-static_bytes len hexstr =
-    hexstr
-        |> ensureSingleWord
-        |> Result.map (trimBytesRight len)
-        |> Result.andThen bytesToStr
-        |> Result.andThen (EthAbi.Types.bytes len)
+static_bytes len =
+    ( Static
+    , \hexstr ->
+        hexstr
+            |> ensureSingleWord
+            |> Result.map (trimBytesRight len)
+            |> Result.andThen bytesToStr
+            |> Result.andThen (EthAbi.Types.bytes len)
+    )
 
 
+trimBytesLeft : Int -> String -> String
 trimBytesLeft len str =
     String.dropLeft (64 - (2 * len)) str
 
 
+trimBytesRight : Int -> String -> String
 trimBytesRight len str =
     String.dropRight (64 - (2 * len)) str
 
-
+hexToBigInt : String -> Result String BigInt
 hexToBigInt hex =
     BigInt.fromString ("0x" ++ hex) |> Result.fromMaybe "Could not parse hex as BigInt"
 
@@ -114,10 +176,14 @@ stringGroupsOf num str =
         |> List.map String.fromList
 
 
+ensureSingleWord : String -> Result String String
 ensureSingleWord hexstr =
     if String.length hexstr == 64 then
         Ok hexstr
     else
         Err "Given ABI hexadecimal string is not 256 bits"
 
-tupleTODO = Decode.map2
+
+
+-- tupleTODO =
+--     Decode.map2
