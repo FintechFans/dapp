@@ -11,18 +11,19 @@ type Int256
 int : Int -> BigInt -> Result String Int256
 int len integer =
     let
-        ensureLenIsPowerOfTwo len integer =
+        ensureLenIsInRange len integer =
             if len > 0 && len < 256 && len % 8 == 0 then
                 Ok integer
             else
-                Err ("Int256 length should be a multiple of 2 and between 8 and 128, but is " ++ (toString len))
+                Err ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
     in
         integer
-            |> ensureLenIsPowerOfTwo len
+            |> ensureLenIsInRange len
             |> Result.andThen (ensureIntegerFits (len - 1))
             |> Result.map (Int256)
 
 
+-- TODO: Constructor shorthand for every `int<M>`?
 int8 =
     int 8
 
@@ -54,11 +55,11 @@ type UInt256
 uint : Int -> BigInt -> Result String UInt256
 uint len integer =
     let
-        ensureLenIsPowerOfTwo len integer =
+        ensureLenIsInRange len integer =
             if len > 0 && len < 256 && len % 8 == 0 then
                 Ok integer
             else
-                Err ("UInt256 length should be a multiple of 2 and between 8 and 128, but is " ++ (toString len))
+                Err ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
 
         ensurePositive integer =
             if BigInt.gte integer (BigInt.fromInt 0) then
@@ -67,11 +68,12 @@ uint len integer =
                 Err ("UInt256 called with a negative value: " ++ toString integer)
     in
         integer
-            |> ensureLenIsPowerOfTwo len
+            |> ensureLenIsInRange len
             |> Result.andThen ensurePositive
             |> Result.andThen (ensureIntegerFits len)
             |> Result.map (UInt256)
 
+-- TODO: Constructor shorthand for every `uint<M>`?
 uint8 =
     uint 8
 
@@ -115,11 +117,11 @@ type Bytes32
 bytes : Int -> String -> Result String Bytes32
 bytes len str =
     let
-        ensureLenIsPowerOfTwo len str =
-            if len > 0 && len < 256 && len % 8 == 0 then
+        ensureLenIsInRange len str =
+            if len > 0 && len < 32 then
                 Ok str
             else
-                Err ("Bytes length should be a multiple of two, but it is " ++ (toString len))
+                Err ("Bytes length should be in range 0..32, but it is " ++ (toString len))
 
         -- TODO
         ensureStringFits str =
@@ -129,25 +131,10 @@ bytes len str =
                 Err "String is too large to fit in a Bytes32."
     in
         str
-            |> ensureLenIsPowerOfTwo len
+            |> ensureLenIsInRange len
             |> Result.andThen ensureStringFits
 
 
-bytes2 =
-    bytes 2
-
-
-bytes4 =
-    bytes 4
-
-
-bytes8 =
-    bytes 8
-
-
-bytes16 =
-    bytes 16
-
-
+-- TODO: Constructor shorthand for every `bytes<M>`?
 bytes32 =
     bytes 32
