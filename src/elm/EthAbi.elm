@@ -283,21 +283,22 @@ decode_args spec val =
         spec_length = List.length spec
         -- TODO: Following line is wrong. Static array and tuples take multiple words from the head at once.
         -- args_head = List.Extra.zip spec words
-        -- args_head = words |> List.foldl ()
+        args_head = group_spec_with_proper_head_words words spec []
         args_tail = List.drop spec_length words
     in
         Err "TODO"
 
-treeize_head : List String -> List AbiSpec -> List (AbiSpec, List String) -> List (AbiSpec, List String)
+-- TODO test implementation
+group_spec_with_proper_head_words : List String -> List AbiSpec -> List (AbiSpec, List String) -> List (AbiSpec, List String)
 
-treeize_head words specs acc =
+group_spec_with_proper_head_words words specs acc =
     case specs of
-        [] -> acc
+        [] -> List.reverse acc
         (spec :: specs) ->
             let
-                (spec_words, other_words) = words |> List.Extra.splitAt 10
+                (spec_words, other_words) = words |> List.Extra.splitAt (num_head_elems spec)
             in
-                treeize_head other_words specs ((spec, spec_words) :: acc)
+                group_spec_with_proper_head_words other_words specs ((spec, spec_words) :: acc)
 
 
 num_head_elems : AbiSpec -> Int
