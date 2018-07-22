@@ -118,7 +118,7 @@ bytes : Int -> String -> Result String Bytes32
 bytes len str =
     let
         ensureLenIsInRange len str =
-            if len > 0 && len < 32 then
+            if len > 0 && len <= 32 then
                 Ok str
             else
                 Err ("Bytes length should be in range 0..32, but it is " ++ (toString len))

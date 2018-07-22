@@ -7,11 +7,13 @@ module EthAbi.Decoder
         , map
           -- , andThen
         , map2
+        , apply
         , int256
         , uint256
         , bool
         , static_bytes
         , static_array
+        , stringTakeFirst
         )
 
 import Char
@@ -53,26 +55,36 @@ map fun ( abi_param_modifier, decoderfun ) =
 
 
 -- TODO does modifier get propagated here properly?
--- andThen : (a -> EthAbiDecoder b) -> EthAbiDecoder a -> EthAbiDecoder b
--- andThen fun ( modifier, decoderfun ) =
---     let
---         compoundfun =
---             \hexstring ->
---                 case decoderfun hexstring of
---                     Err err ->
---                         Err err
---                     Ok res ->
---                         run (fun res) hexstring
---     in
---         ( modifier, compoundfun )
+andThen : (a -> EthAbiDecoder b) -> EthAbiDecoder a -> EthAbiDecoder b
+andThen fun ( modifier, decoderfun ) =
+    let
+        compoundfun =
+            \hexstring ->
+                case decoderfun hexstring of
+                    Err err ->
+                        Err err
+                    Ok (res, hexstring_rest) ->
+                        run_keeping_leftover (fun res) hexstring_rest
+    in
+        ( modifier, compoundfun )
 
 
-run : EthAbiDecoder t -> String -> Result String ( t, String )
+run : EthAbiDecoder t -> String -> Result String t
 run ( modifier, decoder ) hexstring =
-    decoder hexstring
+    let
+        ensureValidResult result =
+            case result of
+                (result, "") -> Ok result
+                (_, hexstring_leftover) -> Err ("At end of parsing had some hexstring left: " ++ hexstring_leftover)
 
 
+    in
+        hexstring
+            |> decoder
+            |> Result.andThen ensureValidResult
 
+
+run_keeping_leftover (modifier, decoder) hexstring = decoder hexstring
 {- TODO this function probably is not that useful,
    since both decoders use the same input text.
 
@@ -98,7 +110,7 @@ map2 fun ( ma, da ) ( mb, db ) =
                         Err err
 
                     Ok ( res, leftover_hexstr ) ->
-                        run (map (fun res) ( mb, db )) leftover_hexstr
+                        run_keeping_leftover (map (fun res) ( mb, db )) leftover_hexstr
     in
         ( modifier, mapped_fun )
 
@@ -130,10 +142,11 @@ int256 =
     ( Static
     , \hexstr ->
         hexstr
-            |> ensureSingleWord
-            |> Result.andThen hexToBigInt
-            |> Result.andThen EthAbi.Types.int256
-            |> Result.map (\res -> ( res, "TODO" ))
+            |> withFirst32Bytes
+               (
+                hexToBigInt
+                    >> Result.andThen EthAbi.Types.int256
+               )
     )
 
 
@@ -142,10 +155,11 @@ uint256 =
     ( Static
     , \hexstr ->
         hexstr
-            |> ensureSingleWord
-            |> Result.andThen hexToBigInt
-            |> Result.andThen EthAbi.Types.uint256
-            |> Result.map (\res -> ( res, "TODO" ))
+            |> withFirst32Bytes
+               (
+                hexToBigInt
+                    >> Result.andThen EthAbi.Types.uint256
+               )
     )
 
 
@@ -166,10 +180,11 @@ bool =
         ( Static
         , \hexstr ->
             hexstr
-                |> ensureSingleWord
-                |> Result.andThen Hex.fromString
-                |> Result.andThen intToBool
-                |> Result.map (\res -> ( res, "TODO" ))
+                |> withFirst32Bytes
+                   (
+                    Hex.fromString
+                        >> Result.andThen intToBool
+                   )
         )
 
 
@@ -178,12 +193,23 @@ static_bytes len =
     ( Static
     , \hexstr ->
         hexstr
-            |> ensureSingleWord
-            |> Result.map (trimBytesRight len)
-            |> Result.andThen bytesToStr
-            |> Result.andThen (EthAbi.Types.bytes len)
-            |> Result.map (\res -> ( res, "TODO" ))
+            |> withFirst32Bytes
+               (
+               (trimBytesRight len)
+               >> bytesToStr
+               >> Result.andThen (EthAbi.Types.bytes len)
+                )
     )
+
+
+array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
+array len ( me, de ) =
+    case me of
+        Static ->
+            static_array len ( me, de )
+
+        Dynamic ->
+            dynamic_array len ( me, de )
 
 
 static_array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
@@ -195,18 +221,35 @@ static_array len ( me, de ) =
                 Ok hexstr
             else
                 Err ("Given ABI hexadecimal string is not 32 * " ++ toString len ++ " bytes long")
+        foofun : EthAbiDecoder elem -> EthAbiDecoder (Array elem) -> EthAbiDecoder (Array elem)
+        foofun elem acc = apply elem (map (flip Array.push) acc)
+        arr = Array.repeat len (me, de)
 
+        res=
+            arr |> Array.foldl (foofun) (succeed Array.empty)
+            -- \hexstring ->
+            --     hexstring
+                    -- |> ensureHexstringSize
+                    -- |> Result.map (stringGroupsOf ((String.length hexstring) // len))
+                    -- |> Result.andThen (List.map (de >> (Result.map Tuple.first)) >> Result.Extra.combine)
+                    -- |> Result.map Array.fromList
+                    -- |> Result.map (\res -> ( res, "TODO" ))
+    in
+        res
+
+dynamic_array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
+dynamic_array len (me, de) =
+    let
+        ensureHexstringSize hexstr =
+            if String.length hexstr >= 64 then Ok hexstr else Err ("Given ABI hexadecimal string is not at least 64 bytes")
         res_fun =
             \hexstring ->
                 hexstring
                     |> ensureHexstringSize
-                    |> Result.map (stringGroupsOf ((String.length hexstring) // len))
-                    |> Result.andThen (List.map (de >> (Result.map Tuple.first)) >> Result.Extra.combine)
-                    |> Result.map Array.fromList
-                    |> Result.map (\res -> ( res, "TODO" ))
+                    |> Result.map (stringTakeFirst 64)
+                    |> Debug.crash "TODO"
     in
-        ( me, res_fun )
-
+        (me, res_fun)
 
 trimBytesLeft : Int -> String -> String
 trimBytesLeft len str =
@@ -244,6 +287,23 @@ stringGroupsOf num str =
         |> List.Extra.groupsOf num
         |> List.map String.fromList
 
+-- TODO does it make more sense to return a Maybe here?
+stringTakeFirst : Int -> String -> Result String (String, String)
+stringTakeFirst num str =
+    case stringGroupsOf num str of
+        [] -> Err ("ABI hexstring too short; expected at least " ++ (toString num) ++ " characters")
+        (head :: tail) ->
+            Ok (head, String.join "" tail)
+
+withFirst32Bytes : (String -> Result String a) -> String -> Result String (a, String)
+withFirst32Bytes fun str =
+    str
+        |> stringTakeFirst 64
+        |> Result.andThen (\(vala, valb) ->
+                               case fun vala of
+                                   Err err -> Err err
+                                   Ok res -> Ok (res, valb)
+                          )
 
 ensureSingleWord : String -> Result String String
 ensureSingleWord hexstr =
