@@ -55,6 +55,8 @@ map fun ( abi_param_modifier, decoderfun ) =
 
 
 -- TODO does modifier get propagated here properly?
+
+
 andThen : (a -> EthAbiDecoder b) -> EthAbiDecoder a -> EthAbiDecoder b
 andThen fun ( modifier, decoderfun ) =
     let
@@ -63,7 +65,8 @@ andThen fun ( modifier, decoderfun ) =
                 case decoderfun hexstring of
                     Err err ->
                         Err err
-                    Ok (res, hexstring_rest) ->
+
+                    Ok ( res, hexstring_rest ) ->
                         run_keeping_leftover (fun res) hexstring_rest
     in
         ( modifier, compoundfun )
@@ -74,17 +77,22 @@ run ( modifier, decoder ) hexstring =
     let
         ensureValidResult result =
             case result of
-                (result, "") -> Ok result
-                (_, hexstring_leftover) -> Err ("At end of parsing had some hexstring left: " ++ hexstring_leftover)
+                ( result, "" ) ->
+                    Ok result
 
-
+                ( _, hexstring_leftover ) ->
+                    Err ("At end of parsing had some hexstring left: " ++ hexstring_leftover)
     in
         hexstring
             |> decoder
             |> Result.andThen ensureValidResult
 
 
-run_keeping_leftover (modifier, decoder) hexstring = decoder hexstring
+run_keeping_leftover ( modifier, decoder ) hexstring =
+    decoder hexstring
+
+
+
 {- TODO this function probably is not that useful,
    since both decoders use the same input text.
 
@@ -134,20 +142,28 @@ decode =
 
 
 
--- TODO two's complement
-
-
 int256 : EthAbiDecoder Int256
 int256 =
-    ( Static
-    , \hexstr ->
-        hexstr
-            |> withFirst32Bytes
-               (
-                hexToBigInt
-                    >> Result.andThen EthAbi.Types.int256
-               )
-    )
+    let
+        twosComplementPow =
+            BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt 255)
+
+        twosComplement bigint =
+            if BigInt.gte bigint twosComplementPow then
+                BigInt.sub bigint (BigInt.mul (BigInt.fromInt 2) twosComplementPow)
+            else
+                bigint
+    in
+        ( Static
+        , \hexstr ->
+            hexstr
+                |> withFirst32Bytes
+                    (hexToBigInt
+                        >> Result.map twosComplement
+                        >> Debug.log "twoscomplement"
+                        >> Result.andThen EthAbi.Types.int256
+                    )
+        )
 
 
 uint256 : EthAbiDecoder UInt256
@@ -156,10 +172,9 @@ uint256 =
     , \hexstr ->
         hexstr
             |> withFirst32Bytes
-               (
-                hexToBigInt
+                (hexToBigInt
                     >> Result.andThen EthAbi.Types.uint256
-               )
+                )
     )
 
 
@@ -181,10 +196,9 @@ bool =
         , \hexstr ->
             hexstr
                 |> withFirst32Bytes
-                   (
-                    Hex.fromString
+                    (Hex.fromString
                         >> Result.andThen intToBool
-                   )
+                    )
         )
 
 
@@ -194,10 +208,9 @@ static_bytes len =
     , \hexstr ->
         hexstr
             |> withFirst32Bytes
-               (
-               (trimBytesRight len)
-               >> bytesToStr
-               >> Result.andThen (EthAbi.Types.bytes len)
+                ((trimBytesRight len)
+                    >> bytesToStr
+                    >> Result.andThen (EthAbi.Types.bytes len)
                 )
     )
 
@@ -221,27 +234,37 @@ static_array len ( me, de ) =
                 Ok hexstr
             else
                 Err ("Given ABI hexadecimal string is not 32 * " ++ toString len ++ " bytes long")
-        foofun : EthAbiDecoder elem -> EthAbiDecoder (Array elem) -> EthAbiDecoder (Array elem)
-        foofun elem acc = apply elem (map (flip Array.push) acc)
-        arr = Array.repeat len (me, de)
 
-        res=
+        foofun : EthAbiDecoder elem -> EthAbiDecoder (Array elem) -> EthAbiDecoder (Array elem)
+        foofun elem acc =
+            apply elem (map (flip Array.push) acc)
+
+        arr =
+            Array.repeat len ( me, de )
+
+        res =
             arr |> Array.foldl (foofun) (succeed Array.empty)
-            -- \hexstring ->
-            --     hexstring
-                    -- |> ensureHexstringSize
-                    -- |> Result.map (stringGroupsOf ((String.length hexstring) // len))
-                    -- |> Result.andThen (List.map (de >> (Result.map Tuple.first)) >> Result.Extra.combine)
-                    -- |> Result.map Array.fromList
-                    -- |> Result.map (\res -> ( res, "TODO" ))
+
+        -- \hexstring ->
+        --     hexstring
+        -- |> ensureHexstringSize
+        -- |> Result.map (stringGroupsOf ((String.length hexstring) // len))
+        -- |> Result.andThen (List.map (de >> (Result.map Tuple.first)) >> Result.Extra.combine)
+        -- |> Result.map Array.fromList
+        -- |> Result.map (\res -> ( res, "TODO" ))
     in
         res
 
+
 dynamic_array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
-dynamic_array len (me, de) =
+dynamic_array len ( me, de ) =
     let
         ensureHexstringSize hexstr =
-            if String.length hexstr >= 64 then Ok hexstr else Err ("Given ABI hexadecimal string is not at least 64 bytes")
+            if String.length hexstr >= 64 then
+                Ok hexstr
+            else
+                Err ("Given ABI hexadecimal string is not at least 64 bytes")
+
         res_fun =
             \hexstring ->
                 hexstring
@@ -249,7 +272,8 @@ dynamic_array len (me, de) =
                     |> Result.map (stringTakeFirst 64)
                     |> Debug.crash "TODO"
     in
-        (me, res_fun)
+        ( me, res_fun )
+
 
 trimBytesLeft : Int -> String -> String
 trimBytesLeft len str =
@@ -287,23 +311,35 @@ stringGroupsOf num str =
         |> List.Extra.groupsOf num
         |> List.map String.fromList
 
+
+
 -- TODO does it make more sense to return a Maybe here?
-stringTakeFirst : Int -> String -> Result String (String, String)
+
+
+stringTakeFirst : Int -> String -> Result String ( String, String )
 stringTakeFirst num str =
     case stringGroupsOf num str of
-        [] -> Err ("ABI hexstring too short; expected at least " ++ (toString num) ++ " characters")
-        (head :: tail) ->
-            Ok (head, String.join "" tail)
+        [] ->
+            Err ("ABI hexstring too short; expected at least " ++ (toString num) ++ " characters")
 
-withFirst32Bytes : (String -> Result String a) -> String -> Result String (a, String)
+        head :: tail ->
+            Ok ( head, String.join "" tail )
+
+
+withFirst32Bytes : (String -> Result String a) -> String -> Result String ( a, String )
 withFirst32Bytes fun str =
     str
         |> stringTakeFirst 64
-        |> Result.andThen (\(vala, valb) ->
-                               case fun vala of
-                                   Err err -> Err err
-                                   Ok res -> Ok (res, valb)
-                          )
+        |> Result.andThen
+            (\( vala, valb ) ->
+                case fun vala of
+                    Err err ->
+                        Err err
+
+                    Ok res ->
+                        Ok ( res, valb )
+            )
+
 
 ensureSingleWord : String -> Result String String
 ensureSingleWord hexstr =

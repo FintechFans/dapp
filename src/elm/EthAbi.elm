@@ -4,6 +4,7 @@ import Char
 import Hex
 import List.Extra
 import Result.Extra
+import BigInt exposing (BigInt)
 
 
 {-| TODO using BigInts where required
@@ -32,9 +33,9 @@ type AbiType
 type
     AbiStaticType
     -- An unsigned (positive) integer:
-    = AbiUint Int
+    = AbiUint BigInt
       -- A signed integer:
-    | AbiInt Int
+    | AbiInt BigInt
       -- A boolean value:
     | AbiBool Bool
       --| A bytes array of known length; i.e bytes3, bytes10, etc:
@@ -72,9 +73,9 @@ type AbiSpec
     | AbiSDynamicTuple Int
 
 -- TODO introduce Int256 and Uint256 types, that are convertable to and from normal Ints and BigInts, with the resp. calls returning Results in the case this is not possible because they are too big or negative.
-uint : Int -> Result String AbiStaticType
+uint : BigInt -> Result String AbiStaticType
 uint int =
-    if int < 0 then
+    if BigInt.lt int (BigInt.fromInt 0) then
         Err "Negative integer cannot be converted to Unsigned Integer"
     else
         Ok (AbiUint int)
@@ -155,7 +156,7 @@ encode_args args =
                             dynamic_address =
                                 head_length + (bytesInHexString prev_tail)
                         in
-                            ( prev_head ++ (static_encode (AbiUint dynamic_address)), prev_tail ++ dynamic_tail val )
+                            ( prev_head ++ (static_encode (AbiUint (BigInt.fromInt dynamic_address))), prev_tail ++ dynamic_tail val )
                 )
     in
         args
@@ -176,7 +177,7 @@ dynamic_tail val =
                 len =
                     List.length vals
             in
-                (static_encode (AbiUint len)) ++ encode_args (vals)
+                (static_encode (AbiUint (BigInt.fromInt len))) ++ encode_args (vals)
 
         AbiArray n_elems vals ->
             vals
@@ -189,7 +190,7 @@ dynamic_tail val =
                     String.length bytes
 
                 lhs =
-                    static_encode (AbiUint len)
+                    static_encode (AbiUint (BigInt.fromInt len))
 
                 rhs =
                     bytes
@@ -242,27 +243,36 @@ static_encode val =
     case val of
         AbiUint int ->
             int
-                |> Hex.toString
+                |> BigInt.toHexString
                 |> padLeftTo32Bytes '0'
 
         AbiInt int ->
-            let
-                hexint =
-                    Hex.toString int
-            in
-                if String.startsWith "-" hexint then
-                    hexint
-                        |> String.dropLeft 1
-                        |> padLeftTo32Bytes 'f'
-                else
-                    hexint
-                        |> padLeftTo32Bytes '0'
+            if
+                BigInt.gte int (BigInt.fromInt 0) then static_encode (AbiUint int)
+            else
+                let
+                    twosComplementPow =
+                        BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt 256)
+                    negToUint bigint = BigInt.add twosComplementPow bigint
+                in
+                static_encode (AbiUint (negToUint int))
+            -- let
+            --     hexint =
+            --         Hex.toString int
+            -- in
+            --     if String.startsWith "-" hexint then
+            --         hexint
+            --             |> String.dropLeft 1
+            --             |> padLeftTo32Bytes 'f'
+            --     else
+            --         hexint
+            --             |> padLeftTo32Bytes '0'
 
         AbiBool bool ->
             if bool then
-                static_encode (AbiUint 1)
+                static_encode (AbiUint (BigInt.fromInt 1))
             else
-                static_encode (AbiUint 0)
+                static_encode (AbiUint (BigInt.fromInt 0))
 
         AbiStaticBytes n_elems bytes ->
             bytes
@@ -277,19 +287,19 @@ static_encode val =
                 |> String.concat
 
 
-decode_args : List AbiSpec -> String -> Result String (List AbiType)
-decode_args spec val =
-    let
-        words = val |> stringGroupsOf 64
-        spec_length = List.length spec
-        -- TODO: Following line is wrong. Static array and tuples take multiple words from the head at once.
-        -- args_head = List.Extra.zip spec words
-        args_head = group_spec_with_proper_head_words words spec []
-        args_tail = List.drop spec_length words
-    in
-        args_head
-            |> List.map (\(spec, head) -> decode_arg spec head words)
-            |> Result.Extra.combine
+-- decode_args : List AbiSpec -> String -> Result String (List AbiType)
+-- decode_args spec val =
+--     let
+--         words = val |> stringGroupsOf 64
+--         spec_length = List.length spec
+--         -- TODO: Following line is wrong. Static array and tuples take multiple words from the head at once.
+--         -- args_head = List.Extra.zip spec words
+--         args_head = group_spec_with_proper_head_words words spec []
+--         args_tail = List.drop spec_length words
+--     in
+--         args_head
+--             |> List.map (\(spec, head) -> decode_arg spec head words)
+--             |> Result.Extra.combine
 
 -- TODO test implementation
 group_spec_with_proper_head_words : List String -> List AbiSpec -> List (AbiSpec, List String) -> List (AbiSpec, List String)
@@ -322,47 +332,47 @@ num_head_elems spec =
         AbiSArray _ _ -> 1 -- is this correct?
         AbiSDynamicTuple _ -> 1
 
-decode_arg : AbiSpec -> List String -> List String -> Result String AbiType
-decode_arg spec val words =
-    let
-        intToBool num = case num of
-                         0 -> Ok False
-                         1 -> Ok True
-                         _ -> Err "Impossible to convert ABI-encoded value to boolean, not '0' or '1'"
-    in
-        case spec of
-            AbiSUint ->
-                case val of
-                    [val] ->
-                        val
-                            |> Hex.fromString
-                            |> Result.map (Static << AbiUint)
-                    _ -> Err "AbiSUint argument larger than expected"
-            AbiSInt ->
-              -- TODO two's complement!
-                case val of
-                    [val] ->
-                        val
-                            |> Hex.fromString
-                            |> Result.map (Static << AbiInt)
-                    _ -> Err "AbiSInt argument larger than expected"
-            AbiSBool ->
-                case val of
-                    [val] ->
-                        val
-                            |> Hex.fromString
-                            |> Result.andThen intToBool
-                            |> Result.map (Static << AbiBool)
-                    _ -> Err "AbiSBool argument larger than expected"
-            AbiSStaticBytes len ->
-                case val of
-                    [val] ->
-                        val
-                            |> trimBytesRight len
-                            |> bytesToStr
-                            |> Result.map(Static << AbiStaticBytes len)
-                    _ -> Err "AbiSStaticBytes argument larger than expected"
-            _ -> Err "Not supported yet"
+-- decode_arg : AbiSpec -> List String -> List String -> Result String AbiType
+-- decode_arg spec val words =
+--     let
+--         intToBool num = case num of
+--                          0 -> Ok False
+--                          1 -> Ok True
+--                          _ -> Err "Impossible to convert ABI-encoded value to boolean, not '0' or '1'"
+--     in
+--         case spec of
+--             AbiSUint ->
+--                 case val of
+--                     [val] ->
+--                         val
+--                             |> Hex.fromString
+--                             |> Result.map (Static << AbiUint)
+--                     _ -> Err "AbiSUint argument larger than expected"
+--             AbiSInt ->
+--               -- TODO two's complement!
+--                 case val of
+--                     [val] ->
+--                         val
+--                             |> Hex.fromString
+--                             |> Result.map (Static << AbiInt)
+--                     _ -> Err "AbiSInt argument larger than expected"
+--             AbiSBool ->
+--                 case val of
+--                     [val] ->
+--                         val
+--                             |> Hex.fromString
+--                             |> Result.andThen intToBool
+--                             |> Result.map (Static << AbiBool)
+--                     _ -> Err "AbiSBool argument larger than expected"
+--             AbiSStaticBytes len ->
+--                 case val of
+--                     [val] ->
+--                         val
+--                             |> trimBytesRight len
+--                             |> bytesToStr
+--                             |> Result.map(Static << AbiStaticBytes len)
+--                     _ -> Err "AbiSStaticBytes argument larger than expected"
+--             _ -> Err "Not supported yet"
 
 trimBytesLeft len str = String.dropLeft (64 - (2 * len)) str
 trimBytesRight len str = String.dropRight (64 - (2 * len)) str
