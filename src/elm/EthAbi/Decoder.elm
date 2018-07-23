@@ -34,23 +34,37 @@ type AbiParamModifier
     | Dynamic
 
 
+{-| On successful decoding, we return a 't', the unparsed rest of the string, and the offset from the beginning of parsing, in groups of 32-bytes.
+This last step is used to properly offset the calculations for dynamic types.
+-}
+type DecodingResult t
+    = DecodingResult t String Int
+
+
+mapDecodingResult fun (DecodingResult val hexstr offset) =
+    DecodingResult (fun val) hexstr offset
+
+
 type alias EthAbiDecoder t =
-    ( AbiParamModifier, String -> Result String ( t, String ) )
+    ( AbiParamModifier, String -> Int -> Result String (DecodingResult t) )
 
 
 succeed : a -> EthAbiDecoder a
 succeed val =
-    ( Static, \hexstr -> Ok ( val, hexstr ) )
+    ( Static, \hexstr offset -> Ok (DecodingResult val hexstr offset) )
 
 
 fail : String -> EthAbiDecoder a
 fail error_message =
-    ( Static, \_ -> Err error_message )
+    ( Static, \_ _ -> Err error_message )
 
 
 map : (a -> b) -> EthAbiDecoder a -> EthAbiDecoder b
 map fun ( abi_param_modifier, decoderfun ) =
-    ( abi_param_modifier, decoderfun >> Result.map (Tuple.mapFirst fun) )
+    ( abi_param_modifier
+    , \hexstr offset ->
+        (decoderfun hexstr offset) |> Result.map (mapDecodingResult fun)
+    )
 
 
 
@@ -61,13 +75,13 @@ andThen : (a -> EthAbiDecoder b) -> EthAbiDecoder a -> EthAbiDecoder b
 andThen fun ( modifier, decoderfun ) =
     let
         compoundfun =
-            \hexstring ->
-                case decoderfun hexstring of
+            \hexstring offset ->
+                case decoderfun hexstring offset of
                     Err err ->
                         Err err
 
-                    Ok ( res, hexstring_rest ) ->
-                        run_keeping_leftover (fun res) hexstring_rest
+                    Ok (DecodingResult res hexstring_rest new_offset) ->
+                        run_keeping_leftover (fun res) hexstring_rest new_offset
     in
         ( modifier, compoundfun )
 
@@ -77,19 +91,18 @@ run ( modifier, decoder ) hexstring =
     let
         ensureValidResult result =
             case result of
-                ( result, "" ) ->
+                DecodingResult result "" _ ->
                     Ok result
 
-                ( _, hexstring_leftover ) ->
+                DecodingResult _ hexstring_leftover _ ->
                     Err ("At end of parsing had some hexstring left: " ++ hexstring_leftover)
     in
-        hexstring
-            |> decoder
+            (decoder hexstring 0)
             |> Result.andThen ensureValidResult
 
 
-run_keeping_leftover ( modifier, decoder ) hexstring =
-    decoder hexstring
+run_keeping_leftover ( modifier, decoder ) hexstring offset =
+    decoder hexstring offset
 
 
 
@@ -112,13 +125,13 @@ map2 fun ( ma, da ) ( mb, db ) =
                     Dynamic
 
         mapped_fun =
-            \hexstring ->
-                case da hexstring of
+            \hexstring offset ->
+                case da hexstring offset of
                     Err err ->
                         Err err
 
-                    Ok ( res, leftover_hexstr ) ->
-                        run_keeping_leftover (map (fun res) ( mb, db )) leftover_hexstr
+                    Ok (DecodingResult res leftover_hexstr new_offset) ->
+                        run_keeping_leftover (map (fun res) ( mb, db )) leftover_hexstr new_offset
     in
         ( modifier, mapped_fun )
 
@@ -141,7 +154,6 @@ decode =
     succeed
 
 
-
 int256 : EthAbiDecoder Int256
 int256 =
     let
@@ -155,12 +167,11 @@ int256 =
                 bigint
     in
         ( Static
-        , \hexstr ->
+        , \hexstr offset ->
             hexstr
-                |> withFirst32Bytes
+                |> (withFirst32Bytes offset)
                     (hexToBigInt
                         >> Result.map twosComplement
-                        >> Debug.log "twoscomplement"
                         >> Result.andThen EthAbi.Types.int256
                     )
         )
@@ -169,9 +180,9 @@ int256 =
 uint256 : EthAbiDecoder UInt256
 uint256 =
     ( Static
-    , \hexstr ->
+    , \hexstr offset ->
         hexstr
-            |> withFirst32Bytes
+            |> (withFirst32Bytes offset)
                 (hexToBigInt
                     >> Result.andThen EthAbi.Types.uint256
                 )
@@ -193,9 +204,9 @@ bool =
                     Err "Impossible to convert ABI-encoded value to boolean, not '0' or '1'"
     in
         ( Static
-        , \hexstr ->
+        , \hexstr offset ->
             hexstr
-                |> withFirst32Bytes
+                |> (withFirst32Bytes offset)
                     (Hex.fromString
                         >> Result.andThen intToBool
                     )
@@ -205,9 +216,9 @@ bool =
 static_bytes : Int -> EthAbiDecoder Bytes32
 static_bytes len =
     ( Static
-    , \hexstr ->
+    , \hexstr offset ->
         hexstr
-            |> withFirst32Bytes
+            |> (withFirst32Bytes offset)
                 ((trimBytesRight len)
                     >> bytesToStr
                     >> Result.andThen (EthAbi.Types.bytes len)
@@ -235,15 +246,15 @@ static_array len ( me, de ) =
             else
                 Err ("Given ABI hexadecimal string is not 32 * " ++ toString len ++ " bytes long")
 
-        foofun : EthAbiDecoder elem -> EthAbiDecoder (Array elem) -> EthAbiDecoder (Array elem)
-        foofun elem acc =
+        accum_fun : EthAbiDecoder elem -> EthAbiDecoder (Array elem) -> EthAbiDecoder (Array elem)
+        accum_fun elem acc =
             apply elem (map (flip Array.push) acc)
 
         arr =
             Array.repeat len ( me, de )
 
         res =
-            arr |> Array.foldl (foofun) (succeed Array.empty)
+            arr |> Array.foldl (accum_fun) (succeed Array.empty)
 
         -- \hexstring ->
         --     hexstring
@@ -326,8 +337,8 @@ stringTakeFirst num str =
             Ok ( head, String.join "" tail )
 
 
-withFirst32Bytes : (String -> Result String a) -> String -> Result String ( a, String )
-withFirst32Bytes fun str =
+withFirst32Bytes : Int -> (String -> Result String a) ->  String -> Result String (DecodingResult a)
+withFirst32Bytes offset fun str =
     str
         |> stringTakeFirst 64
         |> Result.andThen
@@ -337,7 +348,7 @@ withFirst32Bytes fun str =
                         Err err
 
                     Ok res ->
-                        Ok ( res, valb )
+                        Ok (DecodingResult res valb (offset + 1))
             )
 
 
