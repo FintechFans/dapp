@@ -13,7 +13,9 @@ module EthAbi.Decoder
         , bool
         , static_bytes
         , static_array
+        , dynamic_array
         , stringTakeFirst
+        , run_keeping_leftover
         )
 
 import Char
@@ -97,12 +99,17 @@ run ( modifier, decoder ) hexstring =
                 DecodingResult _ hexstring_leftover _ ->
                     Err ("At end of parsing had some hexstring left: " ++ hexstring_leftover)
     in
-            (decoder hexstring 0)
+        (decoder hexstring 0)
             |> Result.andThen ensureValidResult
 
 
+run_keeping_leftover : EthAbiDecoder t -> String -> Int -> Result String (DecodingResult t)
 run_keeping_leftover ( modifier, decoder ) hexstring offset =
-    decoder hexstring offset
+    let
+        x =
+            (toString ((modifier, decoder), hexstring, offset))
+    in
+    decoder (Debug.log x hexstring) offset
 
 
 
@@ -189,6 +196,19 @@ uint256 =
     )
 
 
+{-| Only to be used inside this module;
+Will trim results to fit in one int8 (in an Int),
+-}
+unsafe_int8 : EthAbiDecoder Int
+unsafe_int8 =
+    ( Static
+    , \hexstr offset ->
+        hexstr
+            |> (withFirst32Bytes offset)
+                (Hex.fromString)
+    )
+
+
 bool : EthAbiDecoder Bool
 bool =
     let
@@ -233,42 +253,24 @@ array len ( me, de ) =
             static_array len ( me, de )
 
         Dynamic ->
-            dynamic_array len ( me, de )
+            dynamic_array ( me, de )
 
 
 static_array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
 static_array len ( me, de ) =
     let
-        ensureHexstringSize hexstr =
-            -- TODO: Based on element size?
-            if String.length hexstr == 64 * len then
-                Ok hexstr
-            else
-                Err ("Given ABI hexadecimal string is not 32 * " ++ toString len ++ " bytes long")
+        arr =
+            Array.repeat len ( me, de )
 
         accum_fun : EthAbiDecoder elem -> EthAbiDecoder (Array elem) -> EthAbiDecoder (Array elem)
         accum_fun elem acc =
             apply elem (map (flip Array.push) acc)
-
-        arr =
-            Array.repeat len ( me, de )
-
-        res =
-            arr |> Array.foldl (accum_fun) (succeed Array.empty)
-
-        -- \hexstring ->
-        --     hexstring
-        -- |> ensureHexstringSize
-        -- |> Result.map (stringGroupsOf ((String.length hexstring) // len))
-        -- |> Result.andThen (List.map (de >> (Result.map Tuple.first)) >> Result.Extra.combine)
-        -- |> Result.map Array.fromList
-        -- |> Result.map (\res -> ( res, "TODO" ))
     in
-        res
+        arr |> Array.foldl (accum_fun) (succeed Array.empty)
 
 
-dynamic_array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
-dynamic_array len ( me, de ) =
+dynamic_array : EthAbiDecoder elem -> EthAbiDecoder (Array elem)
+dynamic_array elem_decoder =
     let
         ensureHexstringSize hexstr =
             if String.length hexstr >= 64 then
@@ -277,13 +279,42 @@ dynamic_array len ( me, de ) =
                 Err ("Given ABI hexadecimal string is not at least 64 bytes")
 
         res_fun =
-            \hexstring ->
-                hexstring
-                    |> ensureHexstringSize
-                    |> Result.map (stringTakeFirst 64)
-                    |> Debug.crash "TODO"
+            unsafe_int8
+                |> andThen
+                    (\calculated_offset_from_start ->
+                        ( Dynamic
+                        , (\new_hexstr previous_offset ->
+                            let
+                                dynamic_arr_tail_decoder =
+                                    unsafe_int8 |> andThen (\len -> static_array len elem_decoder)
+
+                                hexstr_tail =
+                                    String.dropLeft (64 * offset_to_array) new_hexstr
+
+                                offset_to_array =
+                                    (calculated_offset_from_start - previous_offset)
+
+                                decoded_dynamic_arr =
+                                    run_keeping_leftover dynamic_arr_tail_decoder hexstr_tail offset_to_array
+                                hexstr_head =
+                                   String.left (64 * offset_to_array) new_hexstr
+                            in
+                                decoded_dynamic_arr
+                                    |> Result.map
+                                        (\(DecodingResult res hexstr_tail_rest offset) ->
+                                            DecodingResult res (hexstr_head ++ hexstr_tail_rest) (previous_offset - offset)
+                                        )
+                          )
+                        )
+                    )
+
+        -- \hexstring offset ->
+        --         |> andThen uint256
+        --         -- |> ensureHexstringSize
+        --         -- |> Result.map (stringTakeFirst 64)
+        --         |> Debug.crash "TODO"
     in
-        ( me, res_fun )
+        res_fun
 
 
 trimBytesLeft : Int -> String -> String
@@ -337,7 +368,7 @@ stringTakeFirst num str =
             Ok ( head, String.join "" tail )
 
 
-withFirst32Bytes : Int -> (String -> Result String a) ->  String -> Result String (DecodingResult a)
+withFirst32Bytes : Int -> (String -> Result String a) -> String -> Result String (DecodingResult a)
 withFirst32Bytes offset fun str =
     str
         |> stringTakeFirst 64
