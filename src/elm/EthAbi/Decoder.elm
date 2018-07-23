@@ -1,7 +1,6 @@
 module EthAbi.Decoder
     exposing
         ( run
-        , decode
         , succeed
         , fail
         , map
@@ -12,10 +11,10 @@ module EthAbi.Decoder
         , uint256
         , bool
         , static_bytes
-        , static_array
-        , dynamic_array
-        , stringTakeFirst
-        , run_keeping_leftover
+        , array
+        , static_array -- TODO remove
+        , dynamic_array -- TODO remove
+        , run_keeping_leftover -- TODO remove
         )
 
 import Char
@@ -107,9 +106,9 @@ run_keeping_leftover : EthAbiDecoder t -> String -> Int -> Result String (Decodi
 run_keeping_leftover ( modifier, decoder ) hexstring offset =
     let
         x =
-            (toString ((modifier, decoder), hexstring, offset))
+            (toString ( ( modifier, decoder ), hexstring, offset ))
     in
-    decoder (Debug.log x hexstring) offset
+        decoder hexstring offset
 
 
 
@@ -118,6 +117,7 @@ run_keeping_leftover ( modifier, decoder ) hexstring offset =
 
    It would make more sense to have `b` run on `a`'s leftover input.
 -}
+{- Used to run two decoders one after the other, on the same hexstring, and combine their results. -}
 
 
 map2 : (a -> b -> c) -> EthAbiDecoder a -> EthAbiDecoder b -> EthAbiDecoder c
@@ -143,22 +143,21 @@ map2 fun ( ma, da ) ( mb, db ) =
         ( modifier, mapped_fun )
 
 
+{-| Used to run multiple decoders one after the other, on the same hexstring.
 
-{- Used to create types for tuple elements -}
+This is used to parse tuples, as well as to parse multiple arguments that are passed to a function
+(according to the ABI documentation, fun(a,b,c) should be parsed as fun((a,b,c,)) so it is the same)
 
+The following are identical ways to do the same thing:
 
+       succeed (,) |> apply int |> apply uint
+
+       map2 (,) int uint
+
+-}
+apply : EthAbiDecoder a -> EthAbiDecoder (a -> b) -> EthAbiDecoder b
 apply =
-    map2 (|>)
-
-
-
--- da
--- |> andThen (\resa -> db |> map (fun resa))
-
-
-decode : a -> EthAbiDecoder a
-decode =
-    succeed
+    (flip << map2) (<|)
 
 
 int256 : EthAbiDecoder Int256
@@ -196,12 +195,12 @@ uint256 =
     )
 
 
-{-| Only to be used inside this module;
-Will trim results to fit in one int8 (in an Int),
+{-| Only to be used inside this module, inside a dynamic decoder;
+- Will trim results to fit in one int8 (in an Int),
 -}
 unsafe_int8 : EthAbiDecoder Int
 unsafe_int8 =
-    ( Static
+    ( Dynamic
     , \hexstr offset ->
         hexstr
             |> (withFirst32Bytes offset)
@@ -286,23 +285,25 @@ dynamic_array elem_decoder =
                         , (\new_hexstr previous_offset ->
                             let
                                 dynamic_arr_tail_decoder =
-                                    unsafe_int8 |> andThen (\len -> static_array len elem_decoder)
+                                    unsafe_int8
+                                        |> andThen (\len -> static_array (Debug.log "dynamic_arr_tail_decoder len " len) elem_decoder)
 
                                 hexstr_tail =
-                                    String.dropLeft (64 * offset_to_array) new_hexstr
+                                    String.dropLeft (64 * offset_to_array) (Debug.log "new_hexstr" new_hexstr)
 
                                 offset_to_array =
-                                    (calculated_offset_from_start - previous_offset)
+                                    Debug.log "offset_to_array" (calculated_offset_from_start - previous_offset)
 
                                 decoded_dynamic_arr =
-                                    run_keeping_leftover dynamic_arr_tail_decoder hexstr_tail offset_to_array
+                                    run_keeping_leftover dynamic_arr_tail_decoder hexstr_tail 0 |> Debug.log ("decoded_dynamic_arr")
+
                                 hexstr_head =
-                                   String.left (64 * offset_to_array) new_hexstr
+                                    String.left (64 * offset_to_array) new_hexstr
                             in
                                 decoded_dynamic_arr
                                     |> Result.map
                                         (\(DecodingResult res hexstr_tail_rest offset) ->
-                                            DecodingResult res (hexstr_head ++ hexstr_tail_rest) (previous_offset - offset)
+                                            DecodingResult res (Debug.log ("combined hexstr") (hexstr_head ++ hexstr_tail_rest)) (Debug.log ("combined offsets") (previous_offset + offset))
                                         )
                           )
                         )
