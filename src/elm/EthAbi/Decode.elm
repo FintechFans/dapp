@@ -1,6 +1,6 @@
-module EthAbi.Decoder
+module EthAbi.Decode
     exposing
-        ( run
+        ( decodeHexstring
         , succeed
         , fail
         , map
@@ -11,10 +11,9 @@ module EthAbi.Decoder
         , uint256
         , bool
         , static_bytes
-        , array
-        , static_array -- TODO remove
-        , dynamic_array -- TODO remove
-        , run_keeping_leftover -- TODO remove
+        , static_array
+        , dynamic_array
+        , partialDecodeHexstring -- TODO remove
         )
 
 import Char
@@ -23,7 +22,7 @@ import Hex
 import List.Extra
 import Result.Extra
 import BigInt exposing (BigInt)
-import EthAbi.Types exposing (Int256, UInt256, Bytes32)
+import EthAbi.Types exposing (Int256, UInt256, Bytes32, Hexstring, hexstringToString)
 
 
 -- Some types are Dynamic, and this propagates up through complex types
@@ -42,25 +41,26 @@ type DecodingResult t
     = DecodingResult t String Int
 
 
+mapDecodingResult : (a -> b) -> DecodingResult a -> DecodingResult b
 mapDecodingResult fun (DecodingResult val hexstr offset) =
     DecodingResult (fun val) hexstr offset
 
 
-type alias EthAbiDecoder t =
+type alias Decoder t =
     ( AbiParamModifier, String -> Int -> Result String (DecodingResult t) )
 
 
-succeed : a -> EthAbiDecoder a
+succeed : a -> Decoder a
 succeed val =
     ( Static, \hexstr offset -> Ok (DecodingResult val hexstr offset) )
 
 
-fail : String -> EthAbiDecoder a
+fail : String -> Decoder a
 fail error_message =
     ( Static, \_ _ -> Err error_message )
 
 
-map : (a -> b) -> EthAbiDecoder a -> EthAbiDecoder b
+map : (a -> b) -> Decoder a -> Decoder b
 map fun ( abi_param_modifier, decoderfun ) =
     ( abi_param_modifier
     , \hexstr offset ->
@@ -72,7 +72,7 @@ map fun ( abi_param_modifier, decoderfun ) =
 -- TODO does modifier get propagated here properly?
 
 
-andThen : (a -> EthAbiDecoder b) -> EthAbiDecoder a -> EthAbiDecoder b
+andThen : (a -> Decoder b) -> Decoder a -> Decoder b
 andThen fun ( modifier, decoderfun ) =
     let
         compoundfun =
@@ -82,14 +82,15 @@ andThen fun ( modifier, decoderfun ) =
                         Err err
 
                     Ok (DecodingResult res hexstring_rest new_offset) ->
-                        run_keeping_leftover (fun res) hexstring_rest new_offset
+                        partialDecodeHexstring (fun res) hexstring_rest new_offset
     in
         ( modifier, compoundfun )
 
 
-run : EthAbiDecoder t -> String -> Result String t
-run ( modifier, decoder ) hexstring =
+decodeHexstring : Decoder t -> Hexstring -> Result String t
+decodeHexstring ( modifier, decoder ) hexstr =
     let
+        str = hexstringToString hexstr
         ensureValidResult result =
             case result of
                 DecodingResult result "" _ ->
@@ -98,12 +99,12 @@ run ( modifier, decoder ) hexstring =
                 DecodingResult _ hexstring_leftover _ ->
                     Err ("At end of parsing had some hexstring left: " ++ hexstring_leftover)
     in
-        (decoder hexstring 0)
+        (decoder str 0)
             |> Result.andThen ensureValidResult
 
 
-run_keeping_leftover : EthAbiDecoder t -> String -> Int -> Result String (DecodingResult t)
-run_keeping_leftover ( modifier, decoder ) hexstring offset =
+partialDecodeHexstring : Decoder t -> String -> Int -> Result String (DecodingResult t)
+partialDecodeHexstring ( modifier, decoder ) hexstring offset =
     let
         x =
             (toString ( ( modifier, decoder ), hexstring, offset ))
@@ -115,12 +116,12 @@ run_keeping_leftover ( modifier, decoder ) hexstring offset =
 {- TODO this function probably is not that useful,
    since both decoders use the same input text.
 
-   It would make more sense to have `b` run on `a`'s leftover input.
+   It would make more sense to have `b` decodeHexstring on `a`'s leftover input.
 -}
-{- Used to run two decoders one after the other, on the same hexstring, and combine their results. -}
+{- Used to decodeHexstring two decoders one after the other, on the same hexstring, and combine their results. -}
 
 
-map2 : (a -> b -> c) -> EthAbiDecoder a -> EthAbiDecoder b -> EthAbiDecoder c
+map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
 map2 fun ( ma, da ) ( mb, db ) =
     let
         modifier =
@@ -138,12 +139,12 @@ map2 fun ( ma, da ) ( mb, db ) =
                         Err err
 
                     Ok (DecodingResult res leftover_hexstr new_offset) ->
-                        run_keeping_leftover (map (fun res) ( mb, db )) leftover_hexstr new_offset
+                        partialDecodeHexstring (map (fun res) ( mb, db )) leftover_hexstr new_offset
     in
         ( modifier, mapped_fun )
 
 
-{-| Used to run multiple decoders one after the other, on the same hexstring.
+{-| Used to decodeHexstring multiple decoders one after the other, on the same hexstring.
 
 This is used to parse tuples, as well as to parse multiple arguments that are passed to a function
 (according to the ABI documentation, fun(a,b,c) should be parsed as fun((a,b,c,)) so it is the same)
@@ -155,12 +156,12 @@ The following are identical ways to do the same thing:
        map2 (,) int uint
 
 -}
-apply : EthAbiDecoder a -> EthAbiDecoder (a -> b) -> EthAbiDecoder b
+apply : Decoder a -> Decoder (a -> b) -> Decoder b
 apply =
     (flip << map2) (<|)
 
 
-int256 : EthAbiDecoder Int256
+int256 : Decoder Int256
 int256 =
     let
         twosComplementPow =
@@ -183,7 +184,7 @@ int256 =
         )
 
 
-uint256 : EthAbiDecoder UInt256
+uint256 : Decoder UInt256
 uint256 =
     ( Static
     , \hexstr offset ->
@@ -198,7 +199,7 @@ uint256 =
 {-| Only to be used inside this module, inside a dynamic decoder;
 - Will trim results to fit in one int8 (in an Int),
 -}
-unsafe_int8 : EthAbiDecoder Int
+unsafe_int8 : Decoder Int
 unsafe_int8 =
     ( Dynamic
     , \hexstr offset ->
@@ -208,7 +209,7 @@ unsafe_int8 =
     )
 
 
-bool : EthAbiDecoder Bool
+bool : Decoder Bool
 bool =
     let
         intToBool num =
@@ -232,7 +233,7 @@ bool =
         )
 
 
-static_bytes : Int -> EthAbiDecoder Bytes32
+static_bytes : Int -> Decoder Bytes32
 static_bytes len =
     ( Static
     , \hexstr offset ->
@@ -245,7 +246,7 @@ static_bytes len =
     )
 
 
-array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
+array : Int -> Decoder elem -> Decoder (Array elem)
 array len ( me, de ) =
     case me of
         Static ->
@@ -255,20 +256,20 @@ array len ( me, de ) =
             dynamic_array ( me, de )
 
 
-static_array : Int -> EthAbiDecoder elem -> EthAbiDecoder (Array elem)
+static_array : Int -> Decoder elem -> Decoder (Array elem)
 static_array len ( me, de ) =
     let
         arr =
             Array.repeat len ( me, de )
 
-        accum_fun : EthAbiDecoder elem -> EthAbiDecoder (Array elem) -> EthAbiDecoder (Array elem)
+        accum_fun : Decoder elem -> Decoder (Array elem) -> Decoder (Array elem)
         accum_fun elem acc =
             apply elem (map (flip Array.push) acc)
     in
         arr |> Array.foldl (accum_fun) (succeed Array.empty)
 
 
-dynamic_array : EthAbiDecoder elem -> EthAbiDecoder (Array elem)
+dynamic_array : Decoder elem -> Decoder (Array elem)
 dynamic_array elem_decoder =
     let
         ensureHexstringSize hexstr =
@@ -295,7 +296,7 @@ dynamic_array elem_decoder =
                                     Debug.log "offset_to_array" (calculated_offset_from_start - previous_offset)
 
                                 decoded_dynamic_arr =
-                                    run_keeping_leftover dynamic_arr_tail_decoder hexstr_tail 0 |> Debug.log ("decoded_dynamic_arr")
+                                    partialDecodeHexstring dynamic_arr_tail_decoder hexstr_tail 0 |> Debug.log ("decoded_dynamic_arr")
 
                                 hexstr_head =
                                     String.left (64 * offset_to_array) new_hexstr

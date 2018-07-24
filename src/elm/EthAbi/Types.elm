@@ -1,8 +1,58 @@
-module EthAbi.Types exposing (..)
+module EthAbi.Types
+    exposing
+        ( Hexstring
+        , hexstring
+        , hexstringToString
+        , Int256
+        , int
+        , int256
+        , int256ToBigInt
+        , UInt256
+        , uint
+        , uint256
+        , uint256ToBigInt
+        , bytes
+        , bytes32
+        , Bytes32
+        )
+
+{-|
+
+ -}
 
 import BigInt exposing (BigInt)
 import Result exposing (Result)
+import Char
+import EthAbi.Internal exposing (ensure, Hexstring(..), Bytes32(..))
 
+type alias Hexstring = EthAbi.Internal.Hexstring
+
+{-| Creates a hexadecimal string from some input string.
+
+  - makes sure that it is actually hexadecimal
+  - Ensures that it is actually a multiple of 32 bytes (64 hexadecimal characters), because all ABI requests and responses are this way.
+
+Do note, that the extra four bytes (8 hexchars) that are prepended to a request to represent the function signature hash mean that those requests are *not* `EthAbi.Hexstring`'s!
+
+TODO have a special data structure for function calls.
+
+-}
+hexstring : String -> Result String Hexstring
+hexstring raw_str =
+    let
+        hexadecimal str =
+            String.all Char.isHexDigit str
+
+        multipleOf32Bytes str =
+            String.length str % 64 == 0
+    in
+        raw_str
+            |> ensure hexadecimal "Not a hexadecimal string"
+            |> Result.andThen (ensure multipleOf32Bytes "String not a multiple of 32 bytes (64 hexadecimal characters)")
+            |> Result.map Hexstring
+
+hexstringToString : Hexstring -> String
+hexstringToString (Hexstring hexstr) = hexstr
 
 type Int256
     = Int256 BigInt
@@ -11,19 +61,19 @@ type Int256
 int : Int -> BigInt -> Result String Int256
 int len integer =
     let
-        ensureLenIsInRange len integer =
-            if len > 0 && len <= 256 && len % 8 == 0 then
-                Ok integer
-            else
-                Err ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
+        appropriateLength len _ =
+            len > 0 && len <= 256 && len % 8 == 0
     in
         integer
-            |> ensureLenIsInRange len
-            |> Result.andThen (ensureIntegerFits (len - 1))
+            |> ensure (appropriateLength len) ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
+            |> Result.andThen (ensure (integerFits (len - 1)) ("Integer too large to fit in " ++ toString len ++ " bits"))
             |> Result.map (Int256)
 
 
+
 -- TODO: Constructor shorthand for every `int<M>`?
+
+
 int8 =
     int 8
 
@@ -43,10 +93,14 @@ int64 =
 int128 =
     int 128
 
+
 int256 =
     int 256
 
-int256ToBigInt (Int256 big_int) = big_int
+
+int256ToBigInt (Int256 big_int) =
+    big_int
+
 
 type UInt256
     = UInt256 BigInt
@@ -55,11 +109,11 @@ type UInt256
 uint : Int -> BigInt -> Result String UInt256
 uint len integer =
     let
-        ensureLenIsInRange len integer =
-            if len > 0 && len <= 256 && len % 8 == 0 then
-                Ok integer
-            else
-                Err ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
+        appropriateLength len _ =
+            len > 0 && len <= 256 && len % 8 == 0
+
+        isPositive integer =
+            BigInt.gte integer (BigInt.fromInt 0)
 
         ensurePositive integer =
             if BigInt.gte integer (BigInt.fromInt 0) then
@@ -68,12 +122,16 @@ uint len integer =
                 Err ("UInt256 called with a negative value: " ++ toString integer)
     in
         integer
-            |> ensureLenIsInRange len
-            |> Result.andThen ensurePositive
-            |> Result.andThen (ensureIntegerFits len)
+            |> ensure (appropriateLength len) ("length should be in range 0..256 and be a multiple of 8, but it is " ++ (toString len))
+            |> Result.andThen (ensure isPositive ("UInt256 called with a negative value: " ++ toString integer))
+            |> Result.andThen (ensure (integerFits len) ("Unsigned Integer too large to fit in " ++ toString len ++ " bits"))
             |> Result.map (UInt256)
 
+
+
 -- TODO: Constructor shorthand for every `uint<M>`?
+
+
 uint8 =
     uint 8
 
@@ -93,25 +151,25 @@ uint64 =
 uint128 =
     uint 128
 
+
 uint256 =
     uint 256
 
-uint256ToBigInt (UInt256 big_int) = big_int
 
-ensureIntegerFits : Int -> BigInt -> Result String BigInt
-ensureIntegerFits len integer =
+uint256ToBigInt (UInt256 big_int) =
+    big_int
+
+
+integerFits : Int -> BigInt -> Bool
+integerFits len integer =
     let
         len_bits len =
             BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt len)
     in
-        if BigInt.lte (BigInt.abs integer) (len_bits len) then
-            Ok integer
-        else
-            Err ("Integer too large to fit in " ++ toString len ++ " bits")
+        BigInt.lte (BigInt.abs integer) (len_bits len)
 
 
-type Bytes32
-    = Bytes32 String
+type alias Bytes32 = EthAbi.Internal.Bytes32
 
 
 bytes : Int -> String -> Result String Bytes32
@@ -135,6 +193,12 @@ bytes len str =
             |> Result.andThen ensureStringFits
 
 
+
 -- TODO: Constructor shorthand for every `bytes<M>`?
+
+
 bytes32 =
     bytes 32
+
+bytes32ToString : Bytes32 -> String
+bytes32ToString (Bytes32 str) = str
