@@ -34,7 +34,12 @@ type alias Hexstring =
 The final 'encode' function finally concatenates these two, but it is important for them to be kept separate because if multiple encoders run one-after-the-other, content needs to be added in-between the two.
 -}
 type alias Encoder =
-    ( Hexstring, Hexstring ) -> ( Hexstring, Hexstring )
+    ( List EncodedValue, List EncodedValue ) -> ( List EncodedValue, List EncodedValue )
+
+
+type EncodedValue
+    = Normal Hexstring
+    | DynamicReference Hexstring
 
 
 encode : Encoder -> EthAbi.Types.Hexstring
@@ -42,13 +47,50 @@ encode encoder =
     let
         concatTuple ( a, b ) =
             a ++ b
+
+        -- resolveDynamicReferences = Debug.crash "TODO"
     in
-        partialEncode encoder ( "", "" )
-            |> concatTuple
+        partialEncode encoder ( [], [] )
+            |> resolveDynamicReferences
+            -- |> concatTuple
             |> EthAbi.Internal.Hexstring
 
 
-partialEncode : Encoder -> ( Hexstring, Hexstring ) -> ( Hexstring, Hexstring )
+resolveDynamicReferences ( head, tail ) =
+    let
+        -- Number of bytes in the head
+        head_length =
+            bytesLength head
+    in
+        Debug.crash "TODO"
+
+-- resolveDynamicReference elem (acc_head, acc_tail) head_length tail =
+--     case elem of
+--         Normal hexstr ->
+--             resolveDynamicReference elem (acc_head ++ hexstr, acc_tail) head_length tail
+--         DynamicReference ->
+
+
+
+
+bytesLength : List EncodedValue -> BigInt
+bytesLength encoded_values =
+    let
+        elemLength elem =
+            case elem of
+                Normal str ->
+                    BigInt.fromInt <| String.length str // 2
+
+                DynamicReference tail ->
+                    BigInt.fromInt 32
+        bigIntSum = List.foldl BigInt.add (BigInt.fromInt 0)
+    in
+        encoded_values
+            |> List.map elemLength
+            |> bigIntSum
+
+
+partialEncode : Encoder -> ( List EncodedValue, List EncodedValue ) -> ( List EncodedValue, List EncodedValue )
 partialEncode encoder hexstr_pair =
     encoder hexstr_pair
 
@@ -121,27 +163,27 @@ bool boolean =
 
 
 bytes32 : Bytes32 -> Encoder
-bytes32 bytes ( hexstr_head, hexstr_tail ) =
+bytes32 bytes ( encoded_values, hexstr_tail ) =
     let
         head =
             bytes
                 |> bytesToHex
                 |> padRightTo32Bytes '0'
     in
-        ( hexstr_head ++ head, hexstr_tail )
+        ( encoded_values ++ [ Normal head ], hexstr_tail )
 
 
 tuple : List Encoder -> Encoder
 tuple encoders =
-    \( hexstr_head, hexstr_tail ) ->
-        case partialEncode (tupleBody encoders) ( "", "" ) of
-            ( only_head, "" ) ->
+    \( encoded_values, hexstr_tail ) ->
+        case partialEncode (tupleBody encoders) ( [], [] ) of
+            ( only_head, [] ) ->
                 -- Static contents, so static tuple
-                ( hexstr_head ++ only_head, hexstr_tail )
+                ( encoded_values ++ only_head, hexstr_tail )
 
             ( head, tail ) ->
                 -- Dynamic contents, so dynamic tuple
-                ( hexstr_head ++ (encodedLocation ( hexstr_head, hexstr_tail )), hexstr_tail ++ (head ++ tail) )
+                ( encoded_values ++ [ DynamicReference "TODO, call resolveReferences here recursively"], hexstr_tail)
 
 
 {-| An array of as of a non-statically declared size.
@@ -151,32 +193,44 @@ Current naming might be confusing.
 dynamic_array : (a -> Encoder) -> List a -> Encoder
 dynamic_array encoder_fun array =
     let
-        dynamic_array_body = partialEncode (dynamicArrayBody encoder_fun array) ( "", "" )
-        concatTuple (a, b) = a ++ b
+        dynamic_array_body =
+            partialEncode (dynamicArrayBody encoder_fun array) ( [], [] )
+
+        concatTuple ( a, b ) =
+            a ++ b
     in
-        \( hexstr_head, hexstr_tail ) ->
-            ( hexstr_head ++ (encodedLocation ( hexstr_head, hexstr_tail ))
-            , hexstr_tail ++ concatTuple dynamic_array_body )
+        \( encoded_values, hexstr_tail ) ->
+            ( encoded_values ++ [ DynamicReference "TODO, call resolveReferences here recursively" {-(concatTuple dynamic_array_body)-}]
+            , hexstr_tail
+            )
+
+
 {-| An array with a static length.
 
 It will be a static type if all contents are static,
 and a dynamic type if it contains a dynamic type.
+
 -}
 static_array : Int -> (a -> Encoder) -> List a -> Encoder
 static_array length encoder_fun array =
     let
-        array_body = partialEncode (arrayBody encoder_fun array) ( "", "" )
-        concatTuple (a, b) = a ++ b
+        array_body =
+            partialEncode (arrayBody encoder_fun array) ( [], [] )
+
+        concatTuple ( a, b ) =
+            a ++ b
     in
-        \(hexstr_head, hexstr_tail) ->
+        \( encoded_values, hexstr_tail ) ->
             case array_body of
-                (head, "") ->
+                ( head, [] ) ->
                     -- Contents static, so this array is a static type
-                    (hexstr_head ++ head, hexstr_tail)
-                (head, tail) ->
+                    ( encoded_values ++ head, hexstr_tail )
+
+                ( head, tail ) ->
                     -- Contents dynamic, so this array is a dynamic type
-                    ( hexstr_head ++ (encodedLocation ( hexstr_head, hexstr_tail ))
-                    , hexstr_tail ++ concatTuple (head, tail) )
+                    ( encoded_values ++ [ DynamicReference "TODO, call resolveReferences here recursively"]
+                    , hexstr_tail
+                    )
 
 
 
@@ -198,9 +252,8 @@ dynamicArrayBody encoding_fun array =
         encodedLength >> arrayBody encoding_fun array
 
 
-
-
-{-| Used by both static and dynamic arrays to encode the elements of the array -}
+{-| Used by both static and dynamic arrays to encode the elements of the array
+-}
 arrayBody : (a -> Encoder) -> List a -> Encoder
 arrayBody encoding_fun array =
     array
@@ -216,10 +269,10 @@ unsafeInt int =
 
 
 encodedLocation : ( Hexstring, Hexstring ) -> Hexstring
-encodedLocation ( hexstr_head, hexstr_tail ) =
+encodedLocation ( encoded_values, hexstr_tail ) =
     let
         offset =
-            elementSize hexstr_head + elementSize hexstr_tail
+            elementSize encoded_values + elementSize hexstr_tail
     in
         offset
             |> BigInt.fromInt
@@ -237,14 +290,14 @@ Only call after making sure that BigInt is expressible in Int256 resp Uint256!
 (This function exists for the overlap in functionality between int256 and uint256 and bool)
 -}
 unsafeBigInt : BigInt -> Encoder
-unsafeBigInt bigint ( hexstr_head, hexstr_tail ) =
+unsafeBigInt bigint ( encoded_values, hexstr_tail ) =
     let
         head =
             bigint
                 |> BigInt.toHexString
                 |> padLeftTo32Bytes '0'
     in
-        ( hexstr_head ++ head, hexstr_tail )
+        ( encoded_values ++ [ Normal head ], hexstr_tail )
 
 
 padLeftTo32Bytes : Char -> String -> String
