@@ -35,6 +35,7 @@
     "webpack-merge": "^4.1.0"
   },
   "dependencies": {
+    "npm": "^6.2.0",
     "semantic-ui-css": "^2.3.3"
   }
 }
