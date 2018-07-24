@@ -9,6 +9,7 @@ module EthAbi.Encode
         , tuple
         , static_array
         , dynamic_array
+        , unsafeBigIntToHexStr 
           -- , partialEncode
           -- TODO
         )
@@ -52,6 +53,7 @@ resolveDynamicReferences values =
     let
         head_length =
             bytesLength values
+                |> Debug.log "head_length"
 
         concatTuple ( a, b ) =
             a ++ b
@@ -68,7 +70,10 @@ resolveDynamicReferencesImpl head_length elem (resolved_head, resolved_tail) =
         DynamicReference tail_str ->
             let
                 reference_location =
-                    BigInt.add head_length (BigInt.fromInt <| String.length resolved_tail // 2)
+                    BigInt.add head_length (BigInt.fromInt <| (String.length resolved_tail) // 2)
+                        |> Debug.log "reference_location"
+                _ = Debug.log "resolved_head" resolved_head
+                _ = Debug.log "resolved_tail" resolved_tail
             in
                 (resolved_head ++ (unsafeBigIntToHexStr reference_location), resolved_tail ++ tail_str)
 
@@ -93,7 +98,7 @@ bytesLength encoded_values =
         elemLength elem =
             case elem of
                 Normal str ->
-                    BigInt.fromInt <| String.length str // 2
+                    BigInt.fromInt <| (String.length str) // 2
 
                 DynamicReference tail ->
                     BigInt.fromInt 32
@@ -104,6 +109,7 @@ bytesLength encoded_values =
         encoded_values
             |> List.map elemLength
             |> bigIntSum
+            |> Debug.log "bytesLength"
 
 
 

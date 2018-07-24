@@ -16,6 +16,12 @@ module EthAbi.Decode
         , partialDecodeHexstring -- TODO remove
         )
 
+{-| TODO
+
+rewrite unsafeInt8 to work with BigInts instead,
+since we need offsets that might be larger than JS' numbers.
+ -}
+
 import Char
 import Array exposing (Array)
 import Hex
@@ -34,7 +40,7 @@ type AbiParamModifier
     | Dynamic
 
 
-{-| On successful decoding, we return a 't', the unparsed rest of the string, and the offset from the beginning of parsing, in groups of 32-bytes.
+{-| On successful decoding, we return a 't', the unparsed rest of the string, and the offset from the beginning of parsing, in bytes.
 This last step is used to properly offset the calculations for dynamic types.
 -}
 type DecodingResult t
@@ -290,7 +296,7 @@ dynamic_array elem_decoder =
                                         |> andThen (\len -> static_array (Debug.log "dynamic_arr_tail_decoder len " len) elem_decoder)
 
                                 hexstr_tail =
-                                    String.dropLeft (64 * offset_to_array) (Debug.log "new_hexstr" new_hexstr)
+                                    String.dropLeft (2 * offset_to_array) (Debug.log "new_hexstr" new_hexstr)
 
                                 offset_to_array =
                                     Debug.log "offset_to_array" (calculated_offset_from_start - previous_offset)
@@ -299,7 +305,7 @@ dynamic_array elem_decoder =
                                     partialDecodeHexstring dynamic_arr_tail_decoder hexstr_tail 0 |> Debug.log ("decoded_dynamic_arr")
 
                                 hexstr_head =
-                                    String.left (64 * offset_to_array) new_hexstr
+                                    String.left (2 * offset_to_array) new_hexstr
                             in
                                 decoded_dynamic_arr
                                     |> Result.map
@@ -381,7 +387,7 @@ withFirst32Bytes offset fun str =
                         Err err
 
                     Ok res ->
-                        Ok (DecodingResult res valb (offset + 1))
+                        Ok (DecodingResult res valb (offset + 32))
             )
 
 
