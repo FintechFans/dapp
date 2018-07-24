@@ -163,15 +163,15 @@ int256 integer =
             int256ToBigInt integer
 
         twosComplementPow =
-            BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt 256)
+            BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt 255)
 
         twos_complement =
             if BigInt.gte bigint (BigInt.fromInt 0) then
                 bigint
             else
-                BigInt.add twosComplementPow bigint
+                BigInt.add (BigInt.mul twosComplementPow (BigInt.fromInt 2)) (bigint)
     in
-        unsafeBigInt bigint
+        unsafeBigInt twos_complement
 
 
 bool : Bool -> Encoder
