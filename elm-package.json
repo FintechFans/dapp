@@ -8,6 +8,7 @@
     ],
     "exposed-modules": [],
     "dependencies": {
+        "Fresheyeball/elm-tuple-extra": "3.0.0 <= v < 4.0.0",
         "NoRedInk/elm-decode-pipeline": "3.0.0 <= v < 4.0.0",
         "cmditch/mel-bew3": "9.0.0 <= v < 10.0.0",
         "elm-community/json-extra": "2.7.0 <= v < 3.0.0",

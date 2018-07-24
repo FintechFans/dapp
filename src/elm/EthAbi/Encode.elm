@@ -1,51 +1,110 @@
-module EthAbi.Encode exposing (encode)
+module EthAbi.Encode
+    exposing
+        ( encode
+        , int256
+        , uint256
+        , bytes32
+        , bool
+        , append
+        , tuple
+        , static_array
+        , dynamic_array
+        , partialEncode
+          -- TODO
+        )
 
 import BigInt exposing (BigInt)
 import Char
 import Hex
 import Result.Extra
 import List.Extra
-
+import Tuple2
 import EthAbi.Types exposing (hexstring, Int256, UInt256, int256ToBigInt, uint256ToBigInt)
 import EthAbi.Internal exposing (ensure, Hexstring, Bytes32(..))
 
+
 -- for internal use only
-type alias Hexstring = String
+
+
+type alias Hexstring =
+    String
+
 
 {-| An Encoder turns an 'a' into a pair of Hexstrings.
 The final 'encode' function finally concatenates these two, but it is important for them to be kept separate because if multiple encoders run one-after-the-other, content needs to be added in-between the two.
- -}
-type alias Encoder a = a -> (Hexstring, Hexstring)-> (Hexstring, Hexstring)
+-}
+type alias Encoder =
+    ( Hexstring, Hexstring ) -> ( Hexstring, Hexstring )
 
-encode : Encoder a -> a -> EthAbi.Types.Hexstring
-encode encoder data =
+
+encode : Encoder -> EthAbi.Types.Hexstring
+encode encoder =
     let
-        concatTuple (a, b) = a ++ b
+        concatTuple ( a, b ) =
+            a ++ b
     in
-            partialEncode encoder data ("", "")
-                      |> concatTuple
-                      |> EthAbi.Internal.Hexstring
+        partialEncode encoder ( "", "" )
+            |> concatTuple
+            |> EthAbi.Internal.Hexstring
 
-partialEncode : Encoder a -> a -> (Hexstring, Hexstring) -> (Hexstring, Hexstring)
-partialEncode encoder data hexstr_pair = encoder data hexstr_pair
 
-uint256 : Encoder UInt256
+partialEncode : Encoder -> ( Hexstring, Hexstring ) -> ( Hexstring, Hexstring )
+partialEncode encoder hexstr_pair =
+    encoder hexstr_pair
+
+
+{-| Runs two encoders one after the other.
+
+Note that `enc_a |> append enc_b |> append enc_c` will give you
+the result of appending enc_c and then enc_b and then enc_a.
+
+Usually, though, don't use this function but instead use `tuple`, `dynamic_array` or `static_array`.
+
+-}
+append : Encoder -> Encoder -> Encoder
+append enc_a enc_b =
+    \hexstr_tuple ->
+        hexstr_tuple
+            |> enc_a
+            |> enc_b
+
+
+
+-- foo : (c -> (a, b)) -> Encoder a -> Encoder b -> Encoder c
+-- foo fun encodera encoderb = contramap (,) (encodera >> encoderb)
+-- contramap2 : (c -> (a, b)) -> Encoder a -> Encoder b -> Encoder c
+-- contramap2 fun enc_a enc_b =
+--     let
+--         combine_results ((a_head, a_tail), (b_head, b_tail)) = (a_head ++ b_head, a_tail ++ b_tail)
+--         in_order (a, b) hexstr_tuple = \val val2 ->
+--                                        (a val hexstr_tuple)
+--                                      |> (b val hexstr_tuple2)
+-- in
+--     \val hexstr ->
+--         val
+--             |> fun
+--             |> Tuple2.mapFirst (\val -> enc_a val hexstr)
+--             |> combine_results
+
+
+uint256 : UInt256 -> Encoder
 uint256 integer =
-            integer
-                |> uint256ToBigInt
-                |> unsafeBigInt
+    integer
+        |> uint256ToBigInt
+        |> unsafeBigInt
 
 
-
-int256 : Encoder Int256
+int256 : Int256 -> Encoder
 int256 integer hexstr_pair =
     let
-        bigint = int256ToBigInt integer
+        bigint =
+            int256ToBigInt integer
+
         twosComplementPow =
             BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt 256)
+
         twos_complement =
-            if
-                BigInt.gte bigint (BigInt.fromInt 0) then
+            if BigInt.gte bigint (BigInt.fromInt 0) then
                 bigint
             else
                 BigInt.add twosComplementPow bigint
@@ -53,40 +112,139 @@ int256 integer hexstr_pair =
         unsafeBigInt bigint hexstr_pair
 
 
-bool : Encoder Bool
+bool : Bool -> Encoder
 bool boolean =
     if boolean then
-        unsafeBigInt (BigInt.fromInt 1)
+        unsafeInt 1
     else
-        unsafeBigInt (BigInt.fromInt 0)
+        unsafeInt 0
 
-bytes32 : Encoder Bytes32
-bytes32 bytes (hexstr_head, hexstr_tail) =
+
+bytes32 : Bytes32 -> Encoder
+bytes32 bytes ( hexstr_head, hexstr_tail ) =
     let
         head =
             bytes
                 |> bytesToHex
                 |> padRightTo32Bytes '0'
     in
-        (hexstr_head ++ head, hexstr_tail)
+        ( hexstr_head ++ head, hexstr_tail )
+
+
+tuple : List Encoder -> Encoder
+tuple encoders =
+    \( hexstr_head, hexstr_tail ) ->
+        case partialEncode (tupleBody encoders) ( "", "" ) of
+            ( only_head, "" ) ->
+                -- Static contents, so static tuple
+                ( hexstr_head ++ only_head, hexstr_tail )
+
+            ( head, tail ) ->
+                -- Dynamic contents, so dynamic tuple
+                ( hexstr_head ++ (encodedLocation ( hexstr_head, hexstr_tail )), hexstr_tail ++ (head ++ tail) )
+
+
+{-| An array of as of a non-statically declared size.
+TODO distinguish 'variable length' arrays from 'dynamic' datatypes.
+Current naming might be confusing.
+-}
+dynamic_array : (a -> Encoder) -> List a -> Encoder
+dynamic_array encoder_fun array =
+    let
+        dynamic_array_body = partialEncode (dynamicArrayBody encoder_fun array) ( "", "" )
+        concatTuple (a, b) = a ++ b
+    in
+        \( hexstr_head, hexstr_tail ) ->
+            ( hexstr_head ++ (encodedLocation ( hexstr_head, hexstr_tail ))
+            , hexstr_tail ++ concatTuple dynamic_array_body )
+{-| An array with a static length.
+
+It will be a static type if all contents are static,
+and a dynamic type if it contains a dynamic type.
+-}
+static_array : Int -> (a -> Encoder) -> List a -> Encoder
+static_array length encoder_fun array =
+    let
+        array_body = partialEncode (arrayBody encoder_fun array) ( "", "" )
+        concatTuple (a, b) = a ++ b
+    in
+        \(hexstr_head, hexstr_tail) ->
+            case array_body of
+                (head, "") ->
+                    -- Contents static, so this array is a static type
+                    (hexstr_head ++ head, hexstr_tail)
+                (head, tail) ->
+                    -- Contents dynamic, so this array is a dynamic type
+                    ( hexstr_head ++ (encodedLocation ( hexstr_head, hexstr_tail ))
+                    , hexstr_tail ++ concatTuple (head, tail) )
+
+
 
 -- Helper:
+
+
+tupleBody : List Encoder -> Encoder
+tupleBody encoders =
+    List.foldr append identity encoders
+
+
+dynamicArrayBody encoding_fun array =
+    let
+        encodedLength =
+            array
+                |> List.length
+                |> unsafeInt
+    in
+        encodedLength >> arrayBody encoding_fun array
+
+
+
+
+{-| Used by both static and dynamic arrays to encode the elements of the array -}
+arrayBody : (a -> Encoder) -> List a -> Encoder
+arrayBody encoding_fun array =
+    array
+        |> List.map encoding_fun
+        |> tupleBody
+
+
+unsafeInt : Int -> Encoder
+unsafeInt int =
+    int
+        |> BigInt.fromInt
+        |> unsafeBigInt
+
+
+encodedLocation : ( Hexstring, Hexstring ) -> Hexstring
+encodedLocation ( hexstr_head, hexstr_tail ) =
+    let
+        offset =
+            elementSize hexstr_head + elementSize hexstr_tail
+    in
+        offset
+            |> BigInt.fromInt
+            |> BigInt.toHexString
+            |> padLeftTo32Bytes '0'
+
+
+elementSize : Hexstring -> Int
+elementSize hexstr =
+    (String.length hexstr) // 64
+
 
 {-| Unsafe!
 Only call after making sure that BigInt is expressible in Int256 resp Uint256!
 (This function exists for the overlap in functionality between int256 and uint256 and bool)
- -}
-unsafeBigInt : Encoder BigInt
-unsafeBigInt bigint (hexstr_head, hexstr_tail) =
+-}
+unsafeBigInt : BigInt -> Encoder
+unsafeBigInt bigint ( hexstr_head, hexstr_tail ) =
     let
         head =
             bigint
                 |> BigInt.toHexString
                 |> padLeftTo32Bytes '0'
     in
-        (hexstr_head ++ head, hexstr_tail)
-
-
+        ( hexstr_head ++ head, hexstr_tail )
 
 
 padLeftTo32Bytes : Char -> String -> String
@@ -106,20 +264,28 @@ bytesToHex (Bytes32 str) =
         |> List.map (Char.toCode >> Hex.toString >> String.padLeft 2 '0')
         |> String.join ""
 
+
 bytesToStr : String -> Result String String
 bytesToStr bytes =
     let
         -- two hexchars -> 0..255 -> char
-        byteToChar = (Hex.fromString >> Result.map (Char.fromCode))
+        byteToChar =
+            (Hex.fromString >> Result.map (Char.fromCode))
     in
-    bytes
-        |> stringGroupsOf 2
-        |> List.map byteToChar
-        |> Result.Extra.combine
-        |> Result.map String.fromList
+        bytes
+            |> stringGroupsOf 2
+            |> List.map byteToChar
+            |> Result.Extra.combine
+            |> Result.map String.fromList
 
-trimBytesLeft len str = String.dropLeft (64 - (2 * len)) str
-trimBytesRight len str = String.dropRight (64 - (2 * len)) str
+
+trimBytesLeft len str =
+    String.dropLeft (64 - (2 * len)) str
+
+
+trimBytesRight len str =
+    String.dropRight (64 - (2 * len)) str
+
 
 stringGroupsOf : Int -> String -> List String
 stringGroupsOf num str =
