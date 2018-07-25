@@ -7,7 +7,7 @@ module EthAbi.Encode
         , bool
         , append
         , tuple
-        , static_array
+        , array
         , dynamic_array
         , bytes
         , string
@@ -130,7 +130,7 @@ bytesLength encoded_values =
 Note that `enc_a |> append enc_b |> append enc_c` will give you
 the result of appending enc_c and then enc_b and then enc_a.
 
-Usually, though, don't use this function but instead use `tuple`, `dynamic_array` or `static_array`.
+Usually, though, don't use this function but instead use `tuple`, `dynamic_array` or `array`.
 
 -}
 append : Encoder -> Encoder -> Encoder
@@ -263,8 +263,8 @@ It will be a static type if all contents are static,
 and a dynamic type if it contains a dynamic type.
 
 -}
-static_array : Int -> (a -> Encoder) -> List a -> Encoder
-static_array length encoder_fun array =
+array : Int -> (a -> Encoder) -> List a -> Encoder
+array length encoder_fun array =
     let
         array_body =
             arrayBody encoder_fun array
@@ -293,17 +293,7 @@ string str =
         |> bytes
 
 
--- \( encoded_values, hexstr_tail ) ->
---     case array_body of
---         ( head, [] ) ->
---             -- Contents static, so this array is a static type
---             ( encoded_values ++ head, hexstr_tail )
---         ( head, tail ) ->
---             -- Contents dynamic, so this array is a dynamic type
---             ( encoded_values ++ [ DynamicReference "TODO, call resolveReferences here recursively" ]
---             , hexstr_tail
---             )
--- Helper:
+-- Internal helper functions:
 
 
 tupleBody : List Encoder -> Encoder

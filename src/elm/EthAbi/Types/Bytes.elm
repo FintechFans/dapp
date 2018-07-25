@@ -1,59 +1,13 @@
 module EthAbi.Types.Bytes
     exposing
-        ( Bytes32
-        , Bytes
-        , static_bytes
+        ( Bytes
         , bytes
-        , bytes1
-        , bytes32
         , fromString
         )
 
 import Char
 import Hex
 import EthAbi.Internal exposing (Bytes32(..), Bytes(..), ensure)
-
-
-type alias Bytes32 =
-    EthAbi.Internal.Bytes32
-
-
-static_bytes : Int -> String -> Result String Bytes32
-static_bytes len str =
-    let
-        ensureLenIsInRange len str =
-            if len > 0 && len <= 32 then
-                Ok str
-            else
-                Err ("Bytes length should be in range 0..32, but it is " ++ (toString len))
-
-        -- TODO
-        ensureStringFits str =
-            if String.length str <= len then
-                Ok (Bytes32 str)
-            else
-                Err "String is too large to fit in a Bytes32."
-    in
-        str
-            |> ensureLenIsInRange len
-            |> Result.andThen ensureStringFits
-
-
-
--- TODO: Constructor shorthand for every `bytes<M>`?
-
-
-bytes1 =
-    static_bytes 1
-
-
-bytes32 =
-    static_bytes 32
-
-
-bytes32ToString : Bytes32 -> String
-bytes32ToString (Bytes32 str) =
-    str
 
 
 type alias Bytes =
@@ -84,7 +38,9 @@ bytes bstr =
 {-| Encodes an arbitrary string into a `Bytes` string,
 
 by interpreting every char as number between [0..255] and writing that as
-two hexdigits [00..ff]
+two hexdigits [00..ff].
+
+ This can never fail.
 
 -}
 fromString : String -> Bytes
@@ -94,3 +50,8 @@ fromString str =
         |> List.map (Char.toCode >> Hex.toString >> String.padLeft 2 '0')
         |> String.join ""
         |> Bytes
+
+
+toString : Bytes -> String
+toString (Bytes str) =
+    str

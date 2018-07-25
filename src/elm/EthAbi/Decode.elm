@@ -11,7 +11,7 @@ module EthAbi.Decode
         , uint256
         , bool
         , static_bytes
-        , static_array
+        , array
         , dynamic_array
         , partialDecodeHexstring -- TODO remove
         )
@@ -30,7 +30,7 @@ import Result.Extra
 import BigInt exposing (BigInt)
 import EthAbi.Types.Int exposing (Int256)
 import EthAbi.Types.UInt exposing (UInt256)
-import EthAbi.Types.Bytes exposing (Bytes32)
+import EthAbi.Types.Bytes32 exposing (Bytes32)
 import EthAbi.Types.Hexstring exposing (Hexstring)
 
 
@@ -254,19 +254,22 @@ static_bytes len =
                 )
     )
 
-
+-- TODO rewrite array logic to properly disambugate:
+-- 1. statically-sized arrays that are encoded in-place.
+-- 2. statically-sized arrays of dynamic elements, that are therefore encoded as a reference with an in-place block in the tail.
+-- 3. dynamically-sized arrays (that are always encoded with firsth the length followed by the elements in the tail).
 array : Int -> Decoder elem -> Decoder (Array elem)
 array len ( me, de ) =
     case me of
         Static ->
-            static_array len ( me, de )
+            arrayImpl len ( me, de )
 
         Dynamic ->
             dynamic_array ( me, de )
 
 
-static_array : Int -> Decoder elem -> Decoder (Array elem)
-static_array len ( me, de ) =
+arrayImpl : Int -> Decoder elem -> Decoder (Array elem)
+arrayImpl len ( me, de ) =
     let
         arr =
             Array.repeat len ( me, de )
@@ -296,7 +299,7 @@ dynamic_array elem_decoder =
                             let
                                 dynamic_arr_tail_decoder =
                                     unsafe_int8
-                                        |> andThen (\len -> static_array (Debug.log "dynamic_arr_tail_decoder len " len) elem_decoder)
+                                        |> andThen (\len -> array (Debug.log "dynamic_arr_tail_decoder len " len) elem_decoder)
 
                                 hexstr_tail =
                                     String.dropLeft (2 * offset_to_array) (Debug.log "new_hexstr" new_hexstr)
