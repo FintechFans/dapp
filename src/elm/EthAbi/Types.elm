@@ -12,20 +12,23 @@ module EthAbi.Types
         , uint256
         , uint256ToBigInt
         , bytes
+        , Bytes
         , bytes32
         , Bytes32
         )
 
-{-|
-
- -}
+{-| -}
 
 import BigInt exposing (BigInt)
 import Result exposing (Result)
 import Char
-import EthAbi.Internal exposing (ensure, Hexstring(..), Bytes32(..))
+import Hex
+import EthAbi.Internal exposing (ensure, Hexstring(..), Bytes32(..), Bytes(..))
 
-type alias Hexstring = EthAbi.Internal.Hexstring
+
+type alias Hexstring =
+    EthAbi.Internal.Hexstring
+
 
 {-| Creates a hexadecimal string from some input string.
 
@@ -51,8 +54,11 @@ hexstring raw_str =
             |> Result.andThen (ensure multipleOf32Bytes "String not a multiple of 32 bytes (64 hexadecimal characters)")
             |> Result.map Hexstring
 
+
 hexstringToString : Hexstring -> String
-hexstringToString (Hexstring hexstr) = hexstr
+hexstringToString (Hexstring hexstr) =
+    hexstr
+
 
 type Int256
     = Int256 BigInt
@@ -169,11 +175,12 @@ integerFits len integer =
         BigInt.lte (BigInt.abs integer) (len_bits len)
 
 
-type alias Bytes32 = EthAbi.Internal.Bytes32
+type alias Bytes32 =
+    EthAbi.Internal.Bytes32
 
 
-bytes : Int -> String -> Result String Bytes32
-bytes len str =
+fixed_bytes : Int -> String -> Result String Bytes32
+fixed_bytes len str =
     let
         ensureLenIsInRange len str =
             if len > 0 && len <= 32 then
@@ -198,7 +205,47 @@ bytes len str =
 
 
 bytes32 =
-    bytes 32
+    fixed_bytes 32
+
 
 bytes32ToString : Bytes32 -> String
-bytes32ToString (Bytes32 str) = str
+bytes32ToString (Bytes32 str) =
+    str
+
+
+type alias Bytes =
+    EthAbi.Internal.Bytes
+
+
+{-| Creates a new `Bytes` object from an existing hexadecimal string that is interpretable as a byte-string:
+
+- Only allowed to contain hexadecimal characters
+- String should have an even length, since otherwise it cannot possibly store bytes.
+-}
+bytes : String -> Result String Bytes
+bytes bstr =
+    let
+        isHexadecimal str =
+            String.all Char.isHexDigit str
+
+        isRepresentableAsBytes str =
+            String.length bstr % 2 == 0
+    in
+        bstr
+            |> ensure isHexadecimal "Not a hexadecimal string, cannot interpret as already-encoded bytes"
+            |> Result.andThen (ensure isRepresentableAsBytes "Hexadecimal string has an odd number of characters, so it cannot possibly store bytes")
+            |> Result.map Bytes
+
+{-| Encodes an arbitrary string into a `Bytes` string,
+
+by interpreting every char as number between [0..255] and writing that as
+two hexdigits [00..ff]
+
+ -}
+bytesFromString : String -> Bytes
+bytesFromString str =
+    str
+        |> String.toList
+        |> List.map (Char.toCode >> Hex.toString >> String.padLeft 2 '0')
+        |> String.join ""
+        |> Bytes

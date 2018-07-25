@@ -9,7 +9,8 @@ module EthAbi.Encode
         , tuple
         , static_array
         , dynamic_array
-        , unsafeBigIntToHexStr 
+        , unsafeBigIntToHexStr
+        , padRightToNearestMultipleOf32Bytes
           -- , partialEncode
           -- TODO
         )
@@ -20,7 +21,7 @@ import Hex
 import Result.Extra
 import List.Extra
 import EthAbi.Types exposing (hexstring, Int256, UInt256, int256ToBigInt, uint256ToBigInt)
-import EthAbi.Internal exposing (ensure, Hexstring, Bytes32(..))
+import EthAbi.Internal exposing (ensure, Hexstring, Bytes32(..), Bytes(..))
 
 
 -- for internal use only
@@ -187,7 +188,7 @@ bytes32 bytes =
     let
         head =
             bytes
-                |> bytesToHex
+                |> bytes32ToHex
                 |> padRightTo32Bytes '0'
     in
         [ Normal head ]
@@ -270,6 +271,20 @@ static_array length encoder_fun array =
         else
             array_body
 
+bytes : Bytes -> Encoder
+bytes (Bytes bstr) =
+    let
+        bytes_length = String.length bstr
+        padded_bytestring = padRightToNearestMultipleOf32Bytes '0' bstr
+        encoded_length = unsafeInt bytes_length
+    in
+            [DynamicReference (resolveDynamicReferences (encoded_length ++ [Normal padded_bytestring]))]
+
+string : String -> Encoder
+string str =
+    str
+        |> EthAbi.Types.bytesFromString
+        |> bytes
 
 
 -- \( encoded_values, hexstr_tail ) ->
@@ -317,17 +332,6 @@ unsafeInt int =
         |> unsafeBigInt
 
 
-encodedReference : ( Hexstring, Hexstring ) -> Hexstring
-encodedReference ( resolved_head, resolved_tail ) =
-    let
-        offset =
-            elementSize resolved_head + elementSize resolved_tail
-    in
-        offset
-            |> BigInt.fromInt
-            |> BigInt.toHexString
-            |> padLeftTo32Bytes '0'
-
 
 elementSize : Hexstring -> Int
 elementSize hexstr =
@@ -359,21 +363,29 @@ padLeftTo32Bytes char str =
     String.padLeft 64 char str
 
 
+padRightToNearestMultipleOf32Bytes : Char -> String -> String
+padRightToNearestMultipleOf32Bytes char str =
+    let
+        string_length = String.length str
+        pad_amount = string_length + (64 - (string_length % 64))
+    in
+        String.padRight pad_amount char str
+
 padRightTo32Bytes : Char -> String -> String
 padRightTo32Bytes char str =
     String.padRight 64 char str
 
 
-bytesToHex : Bytes32 -> String
-bytesToHex (Bytes32 str) =
+bytes32ToHex : Bytes32 -> String
+bytes32ToHex (Bytes32 str) =
     str
         |> String.toList
         |> List.map (Char.toCode >> Hex.toString >> String.padLeft 2 '0')
         |> String.join ""
 
 
-bytesToStr : String -> Result String String
-bytesToStr bytes =
+bytes32ToString : String -> Result String String
+bytes32ToString bytes =
     let
         -- two hexchars -> 0..255 -> char
         byteToChar =

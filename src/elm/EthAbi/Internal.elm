@@ -18,3 +18,6 @@ type Hexstring
 
 type Bytes32
     = Bytes32 String
+
+
+type Bytes = Bytes String
