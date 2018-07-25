@@ -22,13 +22,17 @@ import Char
 import Hex
 import Result.Extra
 import List.Extra
-import EthAbi.Types exposing (hexstring, Int256, UInt256, int256ToBigInt, uint256ToBigInt, bytes)
+import EthAbi.Types.Hexstring
+import EthAbi.Types.Bytes
+import EthAbi.Types.Int exposing (Int256)
+import EthAbi.Types.UInt exposing (UInt256)
+-- import EthAbi.Types exposing (hexstring, Int256, UInt256, int256ToBigInt, uint256ToBigInt, bytes)
 import EthAbi.Internal exposing (ensure, Hexstring, Bytes32(..), Bytes(..))
 
 
 -- for internal use only
 
-
+-- TODO better naming
 type alias Hexstring =
     String
 
@@ -45,7 +49,7 @@ type EncodedValue
     | DynamicReference Hexstring
 
 
-encode : Encoder -> EthAbi.Types.Hexstring
+encode : Encoder -> EthAbi.Types.Hexstring.Hexstring
 encode encoder =
         encoder
             |> resolveDynamicReferences
@@ -155,7 +159,7 @@ append enc_a enc_b =
 uint256 : UInt256 -> Encoder
 uint256 integer =
     integer
-        |> uint256ToBigInt
+        |> EthAbi.Types.UInt.toBigInt
         |> unsafeBigInt
 
 
@@ -163,7 +167,7 @@ int256 : Int256 -> Encoder
 int256 integer =
     let
         bigint =
-            int256ToBigInt integer
+            EthAbi.Types.Int.toBigInt integer
 
         twosComplementPow =
             BigInt.pow (BigInt.fromInt 2) (BigInt.fromInt 255)
@@ -285,7 +289,7 @@ bytes (Bytes bstr) =
 string : String -> Encoder
 string str =
     str
-        |> EthAbi.Types.bytesFromString
+        |> EthAbi.Types.Bytes.fromString
         |> bytes
 
 

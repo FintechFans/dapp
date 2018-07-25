@@ -6,6 +6,7 @@ module EthAbi.Types.Bytes
         , bytes
         , bytes1
         , bytes32
+        , fromString
         )
 
 import Char
@@ -86,8 +87,8 @@ by interpreting every char as number between [0..255] and writing that as
 two hexdigits [00..ff]
 
 -}
-bytesFromString : String -> Bytes
-bytesFromString str =
+fromString : String -> Bytes
+fromString str =
     str
         |> String.toList
         |> List.map (Char.toCode >> Hex.toString >> String.padLeft 2 '0')

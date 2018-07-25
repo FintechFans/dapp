@@ -1,8 +1,19 @@
-module EthAbi.Types.UInt exposing (UInt256, static_uint, uint8, uint16, uint32, uint64, uint128,
-                                       uint256)
+module EthAbi.Types.UInt
+    exposing
+        ( UInt256
+        , static_uint
+        , uint8
+        , uint16
+        , uint32
+        , uint64
+        , uint128
+        , uint256
+        , toBigInt
+        )
 
 import BigInt exposing (BigInt)
 import EthAbi.Internal exposing (ensure)
+
 
 type UInt256
     = UInt256 BigInt
@@ -58,5 +69,5 @@ uint256 =
     static_uint 256
 
 
-uint256ToBigInt (UInt256 big_int) =
+toBigInt (UInt256 big_int) =
     big_int
