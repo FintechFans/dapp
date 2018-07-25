@@ -247,7 +247,7 @@ static_bytes len =
             |> (withFirst32Bytes offset)
                 ((trimBytesRight len)
                     >> bytesToStr
-                    >> Result.andThen (EthAbi.Types.bytes len)
+                    >> Result.andThen (EthAbi.Types.static_bytes len)
                 )
     )
 

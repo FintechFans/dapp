@@ -12,8 +12,10 @@ module EthAbi.Types
         , uint256
         , uint256ToBigInt
         , bytes
+        , bytesFromString
         , Bytes
         , bytes32
+        , static_bytes
         , Bytes32
         )
 
@@ -179,8 +181,8 @@ type alias Bytes32 =
     EthAbi.Internal.Bytes32
 
 
-fixed_bytes : Int -> String -> Result String Bytes32
-fixed_bytes len str =
+static_bytes : Int -> String -> Result String Bytes32
+static_bytes len str =
     let
         ensureLenIsInRange len str =
             if len > 0 && len <= 32 then
@@ -205,7 +207,7 @@ fixed_bytes len str =
 
 
 bytes32 =
-    fixed_bytes 32
+    static_bytes 32
 
 
 bytes32ToString : Bytes32 -> String

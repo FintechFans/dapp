@@ -9,8 +9,10 @@ module EthAbi.Encode
         , tuple
         , static_array
         , dynamic_array
-        , unsafeBigIntToHexStr
-        , padRightToNearestMultipleOf32Bytes
+        , bytes
+        , string
+        -- , unsafeBigIntToHexStr
+        -- , padRightToNearestMultipleOf32Bytes
           -- , partialEncode
           -- TODO
         )
@@ -20,7 +22,7 @@ import Char
 import Hex
 import Result.Extra
 import List.Extra
-import EthAbi.Types exposing (hexstring, Int256, UInt256, int256ToBigInt, uint256ToBigInt)
+import EthAbi.Types exposing (hexstring, Int256, UInt256, int256ToBigInt, uint256ToBigInt, bytes)
 import EthAbi.Internal exposing (ensure, Hexstring, Bytes32(..), Bytes(..))
 
 
