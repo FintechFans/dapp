@@ -251,7 +251,7 @@ dynamic_array encoder_fun array =
         --     a ++ b
     in
         -- \( encoded_values, hexstr_tail ) ->
-        [ DynamicReference (resolveDynamicReferences dynamic_array_body)
+        [ DynamicReference (dynamic_array_body)
 
         {- (concatTuple dynamic_array_body) -}
         ]
@@ -282,9 +282,9 @@ bytes (Bytes bstr) =
     let
         bytes_length = String.length bstr
         padded_bytestring = padRightToNearestMultipleOf32Bytes '0' bstr
-        encoded_length = unsafeInt bytes_length
+        encoded_length = unsafeIntToHexStr bytes_length
     in
-            [DynamicReference (resolveDynamicReferences (encoded_length ++ [Normal padded_bytestring]))]
+            [DynamicReference (encoded_length ++ padded_bytestring)]
 
 string : String -> Encoder
 string str =
@@ -302,14 +302,15 @@ tupleBody encoders =
     -- List.foldr append identity encoders
 
 
+dynamicArrayBody : (a -> Encoder) -> List a -> String
 dynamicArrayBody encoding_fun array =
     let
         encodedLength =
             array
                 |> List.length
-                |> unsafeInt
+                |> unsafeIntToHexStr
     in
-        encodedLength ++ arrayBody encoding_fun array
+        encodedLength ++ resolveDynamicReferences (arrayBody encoding_fun array)
 
 
 {-| Used by both static and dynamic arrays to encode the elements of the array
@@ -327,7 +328,10 @@ unsafeInt int =
         |> BigInt.fromInt
         |> unsafeBigInt
 
-
+unsafeIntToHexStr int =
+    int
+        |> BigInt.fromInt
+        |> unsafeBigIntToHexStr
 
 elementSize : Hexstring -> Int
 elementSize hexstr =
@@ -347,6 +351,7 @@ unsafeBigInt bigint =
                 |> padLeftTo32Bytes '0'
     in
         [ Normal head ]
+
 
 unsafeBigIntToHexStr bigint =
     bigint

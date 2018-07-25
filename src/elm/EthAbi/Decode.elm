@@ -43,8 +43,8 @@ type AbiParamModifier
     | Dynamic
 
 
-{-| On successful decoding, we return a 't', the unparsed rest of the string, and the offset from the beginning of parsing, in bytes.
-This last step is used to properly offset the calculations for dynamic types.
+{-| On successful decoding, we return a `t`, the unparsed rest of the string, and the offset from the beginning of parsing, in bytes.
+This offset is used to properly offset the calculations for dynamic types.
 -}
 type DecodingResult t
     = DecodingResult t String Int
@@ -122,14 +122,7 @@ partialDecodeHexstring ( modifier, decoder ) hexstring offset =
 
 
 
-{- TODO this function probably is not that useful,
-   since both decoders use the same input text.
-
-   It would make more sense to have `b` decodeHexstring on `a`'s leftover input.
--}
-{- Used to decodeHexstring two decoders one after the other, on the same hexstring, and combine their results. -}
-
-
+{-| Used to decodeHexstring two decoders one after the other, on the same hexstring, and combine their results. -}
 map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
 map2 fun ( ma, da ) ( mb, db ) =
     let
@@ -250,7 +243,7 @@ static_bytes len =
             |> (withFirst32Bytes offset)
                 ((trimBytesRight len)
                     >> bytesToStr
-                    >> Result.andThen (EthAbi.Types.Bytes.static_bytes len)
+                    >> Result.andThen (EthAbi.Types.Bytes32.bytes len)
                 )
     )
 
