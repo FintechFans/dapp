@@ -71,7 +71,7 @@ renderPage : Route -> PageContent Msg -> Html Msg
 renderPage current_route page_content =
     div [class "pagewrapper"]
         [ div [class "ui breadcrumb"] (renderBreadcrumbs current_route page_content.breadcrumbs)
-        , div [class "ui header"] [page_content.title]
+        , div [class "ui huge header"] [page_content.title]
         , div [class "pagewrapper-inner"] [page_content.content]
         ]
 

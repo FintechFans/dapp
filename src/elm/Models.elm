@@ -29,10 +29,10 @@ initialModel route =
 
 initial_listings : Dict String Listing
 initial_listings =
-    [ {title = "For Hire" , id = "0", rating = 2}
-    , {title = "For Hire2", id = "1", rating = 2}
-    , {title = "For Hire4", id = "2", rating = 2}
-    , {title = "For Hire5", id = "3", rating = 2}
+    [ {title = "Looking for a Cryptoanalyst" , id = "0", rating = 2}
+    , {title = "Financial Expert", id = "1", rating = 2}
+    , {title = "Manager wanted", id = "2", rating = 2}
+    , {title = "Enthausiastic Marketing Specialist", id = "3", rating = 2}
     ]
     |> List.map(\elem -> (elem.id, elem))
     |> Dict.fromList

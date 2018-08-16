@@ -34,17 +34,31 @@ listingElem listing =
     let
         path =
             Routing.listingPath listing.id
+
+        label =
+            span [ class "ui green label" ] [ text "For Hire" ]
+
+        title =
+            span [] [ text listing.title ]
+
+        date =
+            div [ class "date" ] [ text "1 day ago" ]
+
+        author =
+            span [ class "author" ] [ text "Wiebe-Marten Wijnja" ]
     in
         linkTo path
             [ class "event listing-item" ]
             [ div [ class "content" ]
                 [ div [ class "summary" ]
-                    [ span [ class "ui green label" ] [ text "For Hire" ]
-                    , span [] [ text listing.title ]
-                    , div [ class "date" ] [ text "1 day ago" ]
+                    [ label
+                    , text " "
+                    , title
+                    , date
                     ]
                 , div [ class "meta" ]
                     [ rating_view listing.rating
+                    , author
                     ]
                 ]
             ]
@@ -52,10 +66,53 @@ listingElem listing =
 
 listing_view : Listing -> PageContent Msg
 listing_view listing =
-    { title = text ("Listing " ++ listing.id)
-    , breadcrumbs = listingsBreadcrumbs ++ [ ( ListingRoute listing.id, listing.title ) ]
-    , content = div [] [ text ("TEST " ++ (listing.id)) ]
-    }
+    let
+        label =
+            span [ class "ui green label" ] [ text "For Hire" ]
+
+        author =
+            span [ class "author" ] [ text "Wiebe-Marten Wijnja" ]
+
+        description =
+                [ div [ class "ui header" ] [ text "Description" ]
+                , div [] [ text ("A longer description of the freelance job will be placed here.") ]
+                ]
+
+        status =
+                [ div [ class "ui header" ] [ text "Status" ]
+                , div [] [ text "Status of fulfillment" ]
+                ]
+
+        timeline =
+            div []
+                [ div [ class "ui header" ] [ text "Timeline" ]
+                , div [] [ text "Timeline here" ]
+                ]
+
+        rating =
+            rating_view listing.rating
+    in
+        { title = span [] [ label, text " ", text listing.title ]
+        , breadcrumbs = listingsBreadcrumbs ++ [ ( ListingRoute listing.id, listing.title ) ]
+        , content =
+            div [ class "ui stackable celled grid" ]
+                [ div [ class "row" ]
+                    [ div [ class "twelve wide column" ]
+                        (description ++ status)
+                    , div [ class "four wide column" ]
+                        [ div [ class "ui header" ]
+                            [ text "Author: "
+                            , author
+                            ]
+                        , rating
+                        , div [] [ text "Author info down here" ]
+                        ]
+                    ]
+                , div [ class "row" ]
+                    [ div [ class "sixteen wide column" ] [ timeline ]
+                    ]
+                ]
+        }
 
 
 rating_view : Int -> Html Msg
